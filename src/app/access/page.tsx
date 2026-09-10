@@ -225,24 +225,31 @@ export default function KioskPage() {
             )}
           </div>
 
-          {/* Center: Radar Ring + Big Clock + Consigne */}
-          <div className="relative flex flex-col items-center justify-center my-auto z-10">
-            {/* Animated Radar Pulse Rings */}
-            <div className="absolute w-[340px] h-[340px] rounded-full border border-white/20 pointer-events-none animate-radar" />
-            <div className="absolute w-[340px] h-[340px] rounded-full border border-white/20 pointer-events-none animate-radar-delayed" />
+          {/* Center: Concentric Radar Waves + Clock Circle + Consigne */}
+          <div className="flex flex-col items-center justify-center my-auto z-10">
+            {/* Clock Circle with Perfectly Concentric Radar Pulse Rings */}
+            <div className="relative flex items-center justify-center">
+              {/* Concentric expanding pulse waves - exactly centered on the clock circle */}
+              <div className="absolute -inset-3 rounded-full border border-white/35 pointer-events-none animate-radar" />
+              <div className="absolute -inset-3 rounded-full border border-white/35 pointer-events-none animate-radar-delayed" />
+              <div
+                className="absolute -inset-8 rounded-full border border-white/20 pointer-events-none animate-radar"
+                style={{ animationDelay: "0.65s" }}
+              />
 
-            {/* Static Ring Container */}
-            <div className="w-[320px] h-[320px] rounded-full border border-white/40 flex flex-col items-center justify-center text-center p-6 bg-white/5 backdrop-blur-xs shadow-2xl">
-              <div className="text-[72px] md:text-[84px] font-extralight tracking-tight nums text-white leading-none">
-                {time || "--:--:--"}
-              </div>
-              <div className="text-[16px] md:text-[18px] text-white/90 capitalize mt-3 font-medium">
-                {dateStr}
+              {/* Static Clock Circle */}
+              <div className="w-[320px] h-[320px] rounded-full border border-white/40 flex flex-col items-center justify-center text-center p-6 bg-white/10 backdrop-blur-md shadow-2xl relative z-10">
+                <div className="text-[72px] md:text-[84px] font-extralight tracking-tight nums text-white leading-none">
+                  {time || "--:--:--"}
+                </div>
+                <div className="text-[16px] md:text-[18px] text-white/90 capitalize mt-3 font-medium">
+                  {dateStr}
+                </div>
               </div>
             </div>
 
             {/* Instructions */}
-            <div className="mt-12 text-center">
+            <div className="mt-10 text-center">
               <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white/15 backdrop-blur-md border border-white/30 shadow-lg">
                 <Radio className="w-5 h-5 text-blue-200 animate-pulse" />
                 <span className="text-[22px] md:text-[24px] font-medium tracking-wide text-white">
