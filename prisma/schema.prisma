@@ -61,21 +61,24 @@ model AuditLog {
 // ─── Adhérents & formules ──────────────────────────────────────────
 
 model Member {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   firstName     String
   lastName      String
   phone         String?
   email         String?
   photoUrl      String?
   notes         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   subscriptions Subscription[]
   cards         Card[]
   payments      Payment[]
   accessLogs    AccessLog[]
   alerts        Alert[]
+
+  @@index([deletedAt, createdAt])
+  @@index([phone])
 }
 
 model Plan {
@@ -116,6 +119,8 @@ model Subscription {
 
   @@index([endDate])
   @@index([memberId, status])
+  @@index([status, endDate])
+  @@index([createdAt])
 }
 
 // ─── Cartes RFID ───────────────────────────────────────────────────
@@ -135,6 +140,7 @@ model Card {
   createdAt  DateTime    @default(now())
 
   @@index([memberId])
+  @@index([status, createdAt])
 }
 
 // ─── Caisse ────────────────────────────────────────────────────────
@@ -204,6 +210,8 @@ model AccessLog {
 
   @@index([createdAt])
   @@index([cardUid, createdAt])
+  @@index([decision, createdAt])
+  @@index([memberId, createdAt])
 }
 
 enum AlertLevel {

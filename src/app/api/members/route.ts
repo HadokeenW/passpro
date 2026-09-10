@@ -28,26 +28,48 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    // Fetch members matching query
-    const totalMatching = await prisma.member.count({ where });
-
-    const members = await prisma.member.findMany({
-      where,
-      include: {
-        subscriptions: {
-          orderBy: { endDate: "desc" },
-          take: 1,
-          include: { plan: true },
-        },
-        cards: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
     const now = new Date();
+    if (filter === "active") {
+      where.subscriptions = {
+        some: {
+          status: "ACTIVE",
+          endDate: { gte: now },
+        },
+      };
+    } else if (filter === "inactive") {
+      where.subscriptions = {
+        none: {
+          status: "ACTIVE",
+          endDate: { gte: now },
+        },
+      };
+    } else if (filter === "blocked") {
+      where.cards = {
+        some: {
+          status: "BLOCKED",
+        },
+      };
+    }
 
-    // Map and calculate derived status for each
-    const enriched = members.map((m) => {
+    const [total, members] = await Promise.all([
+      prisma.member.count({ where }),
+      prisma.member.findMany({
+        where,
+        include: {
+          subscriptions: {
+            orderBy: { endDate: "desc" },
+            take: 1,
+            include: { plan: true },
+          },
+          cards: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const paginated = members.map((m) => {
       const latestSub = m.subscriptions[0] || null;
       const status = latestSub ? deriveStatus(latestSub, now) : "NO_SUBSCRIPTION";
       const activeCard = m.cards.find((c) => c.status === "ACTIVE");
@@ -77,27 +99,6 @@ export async function GET(req: NextRequest) {
           : null,
       };
     });
-
-    // Apply status filter if specified
-    let filtered = enriched;
-    if (filter === "active") {
-      filtered = enriched.filter(
-        (m) => m.subscription?.status === "ACTIVE" || m.subscription?.status === "EXPIRING_SOON"
-      );
-    } else if (filter === "inactive") {
-      filtered = enriched.filter(
-        (m) =>
-          !m.subscription ||
-          m.subscription.status === "EXPIRED" ||
-          m.subscription.status === "CANCELLED" ||
-          m.subscription.status === "NO_SUBSCRIPTION"
-      );
-    } else if (filter === "blocked") {
-      filtered = enriched.filter((m) => m.card?.status === "BLOCKED");
-    }
-
-    const total = filtered.length;
-    const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
     return NextResponse.json({
       items: paginated,

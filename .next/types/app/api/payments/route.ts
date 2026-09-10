@@ -1,4 +1,4 @@
-// File: C:\Users\stowi\Documents\passpro2\src\app\api\payments\route.ts
+// File: C:\Users\Click\Downloads\New folder (3)\passpro\src\app\api\payments\route.ts
 import * as entry from '../../../../../src/app/api/payments/route.js'
 import type { NextRequest } from 'next/server.js'
 

@@ -9,30 +9,44 @@ import { StatusPill } from "@/components/business/StatusPill";
 import { EmptyState } from "@/components/business/EmptyState";
 import { formatDateTime } from "@/lib/dates";
 import { History, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { getCachedData, setCachedData } from "@/lib/cache";
 
 export default function AccessLogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const initialCacheKey = "/api/access/logs?page=1&pageSize=25&decision=all&q=";
+  const initialData = getCachedData<any>(initialCacheKey);
+
+  const [logs, setLogs] = useState<any[]>(() => initialData?.items || []);
+  const [total, setTotal] = useState(() => initialData?.total || 0);
   const [page, setPage] = useState(1);
   const [decision, setDecision] = useState("all");
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
 
   const fetchLogs = () => {
-    setIsLoading(true);
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: "25",
       decision,
       q: search,
     });
+    const url = `/api/access/logs?${params.toString()}`;
+    const cached = getCachedData<any>(url);
 
-    fetch(`/api/access/logs?${params.toString()}`)
+    if (cached) {
+      setLogs(cached.items || []);
+      setTotal(cached.total || 0);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.items) {
           setLogs(data.items);
           setTotal(data.total);
+          setCachedData(url, data);
         }
       })
       .catch(console.error)

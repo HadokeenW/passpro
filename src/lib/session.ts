@@ -19,7 +19,7 @@ export const sessionOptions: SessionOptions = {
     "passpro-super-secret-key-at-least-32-chars-long-2026",
   cookieName: "passpro_session",
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.COOKIE_SECURE === "true",
     httpOnly: true,
     sameSite: "lax",
     maxAge: 12 * 60 * 60, // 12h default

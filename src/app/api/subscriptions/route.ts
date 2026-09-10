@@ -22,18 +22,39 @@ export async function GET(req: NextRequest) {
       where.memberId = memberId;
     }
 
-    const subscriptions = await prisma.subscription.findMany({
-      where,
-      include: {
-        member: true,
-        plan: true,
-      },
-      orderBy: { endDate: "desc" },
-    });
-
     const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const mapped = subscriptions.map((sub) => {
+    if (statusFilter === "active") {
+      where.status = "ACTIVE";
+      where.endDate = { gte: now };
+    } else if (statusFilter === "expiring") {
+      where.status = "ACTIVE";
+      where.endDate = { gte: now, lte: in7Days };
+    } else if (statusFilter === "expired") {
+      where.OR = [
+        { status: "EXPIRED" },
+        { endDate: { lt: now } },
+      ];
+    } else if (statusFilter === "suspended") {
+      where.status = "SUSPENDED";
+    }
+
+    const [total, subscriptions] = await Promise.all([
+      prisma.subscription.count({ where }),
+      prisma.subscription.findMany({
+        where,
+        include: {
+          member: true,
+          plan: true,
+        },
+        orderBy: { endDate: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const paginated = subscriptions.map((sub) => {
       const details = getSubscriptionDetails(sub, now);
       return {
         id: sub.id,
@@ -60,20 +81,6 @@ export async function GET(req: NextRequest) {
         createdAt: sub.createdAt,
       };
     });
-
-    let filtered = mapped;
-    if (statusFilter === "active") {
-      filtered = mapped.filter((s) => s.status === "ACTIVE");
-    } else if (statusFilter === "expiring") {
-      filtered = mapped.filter((s) => s.status === "EXPIRING_SOON");
-    } else if (statusFilter === "expired") {
-      filtered = mapped.filter((s) => s.status === "EXPIRED");
-    } else if (statusFilter === "suspended") {
-      filtered = mapped.filter((s) => s.status === "SUSPENDED");
-    }
-
-    const total = filtered.length;
-    const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
     return NextResponse.json({
       items: paginated,

@@ -29,6 +29,18 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+import { getCachedData, setCachedData, prewarmRoute, prewarmAllCoreRoutes } from "@/lib/cache";
+
+const routePrewarmMap: Record<string, string[]> = {
+  "/": ["/api/dashboard/metrics", "/api/dashboard/heatmap", "/api/dashboard/activity?limit=15"],
+  "/members": ["/api/members?page=1&pageSize=15&filter=all&q="],
+  "/subscriptions": ["/api/subscriptions?page=1&pageSize=15&status=all"],
+  "/cards": ["/api/cards?page=1&pageSize=15&status=all&q="],
+  "/payments": ["/api/payments?page=1&pageSize=15&period=today"],
+  "/access-logs": ["/api/access/logs?page=1&pageSize=25&decision=all&q="],
+  "/plans": ["/api/plans?includeInactive=true"],
+};
+
 interface UserInfo {
   id: string;
   username: string;
@@ -52,9 +64,23 @@ interface NavGroup {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<UserInfo | null>(null);
+  const cachedMe = getCachedData<any>("/api/auth/me");
+  const [user, setUser] = useState<UserInfo | null>(() => cachedMe?.user || null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isLoadingUser, setIsLoadingUser] = useState(() => !cachedMe?.user);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const prevPathRef = useRef(pathname);
+
+  // Smooth route transition indicator
+  useEffect(() => {
+    if (prevPathRef.current !== pathname) {
+      prevPathRef.current = pathname;
+      setIsNavigating(true);
+      const timer = setTimeout(() => setIsNavigating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname]);
 
   // Global Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,16 +99,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isLoadingNotifs, setIsLoadingNotifs] = useState(false);
   const notifContainerRef = useRef<HTMLDivElement>(null);
 
+  // User Profile Dropdown State
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileContainerRef = useRef<HTMLDivElement>(null);
+
   // Fetch user info and unread notifications count
   const fetchUnreadCount = () => {
     fetch("/api/notifications?unread=true&pageSize=1")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data.unreadCount !== undefined) {
+        if (data && data.unreadCount !== undefined) {
           setUnreadCount(data.unreadCount);
         }
       })
-      .catch(console.error);
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -93,15 +123,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           router.push("/login");
         } else {
           setUser(data.user);
+          setCachedData("/api/auth/me", data);
+          fetchUnreadCount();
+          setTimeout(() => prewarmAllCoreRoutes(), 300);
         }
       })
       .catch(() => router.push("/login"))
       .finally(() => setIsLoadingUser(false));
 
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 45000);
+    const interval = setInterval(() => {
+      if (user) fetchUnreadCount();
+    }, 60000);
     return () => clearInterval(interval);
-  }, [router]);
+  }, []);
 
   // Click outside handlers for popovers
   useEffect(() => {
@@ -117,6 +151,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         !notifContainerRef.current.contains(event.target as Node)
       ) {
         setIsNotifOpen(false);
+      }
+      if (
+        profileContainerRef.current &&
+        !profileContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -294,27 +334,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       searchResults.plans.length > 0);
 
   return (
-    <div className="min-h-screen flex bg-[#F6F8FB]">
-      {/* 1. Sidebar (240px) */}
-      <aside className="w-[240px] bg-white border-r border-[#E2E8F0] flex flex-col shrink-0 fixed inset-y-0 left-0 z-30">
-        <div className="h-16 px-5 flex items-center border-b border-[#F1F5F9] shrink-0">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-[7px] bg-[#2563EB] flex items-center justify-center text-white font-bold text-[14px]">
-              P
-            </div>
-            <span className="text-[16px] font-bold tracking-tight text-[#0F172A]">
-              PASSPro<span className="text-[#2563EB]">.</span>
-            </span>
-          </Link>
+    <div className="h-screen max-h-screen bg-[#EEF2F7] p-3 sm:p-4 lg:p-5 flex gap-4 lg:gap-5 overflow-hidden font-sans relative">
+      {/* Instant route transition indicator */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-[#2563EB] z-[100] animate-pulse shadow-sm shadow-blue-500/50" />
+      )}
+
+      {/* Mobile Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-30 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* 1. Left Floating Sidebar Card */}
+      <aside
+        className={cn(
+          "w-[240px] lg:w-[250px] bg-white rounded-[26px] border border-[#E2E8F0]/80 shadow-[0_10px_35px_rgba(15,23,42,0.035)] p-5 flex flex-col justify-between shrink-0 transition-all duration-300 z-40",
+          "fixed md:relative inset-y-3 left-3 md:inset-auto md:left-auto",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-[110%] md:translate-x-0"
+        )}
+      >
+        {/* Mobile close button (hidden on desktop) */}
+        <div className="flex items-center justify-end px-1 md:hidden mb-2 shrink-0">
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="text-[#94A3B8] hover:text-[#0F172A] p-1"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        {/* Middle: Navigation Items */}
+        <div className="flex-1 overflow-y-auto space-y-4 py-1 pr-1">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 mb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-[#94A3B8] select-none">
+              <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[#94A3B8] select-none">
                 {group.label}
               </div>
-              <nav className="space-y-0.5">
+              <nav className="space-y-1">
                 {group.items.map((item) => {
                   const isActive =
                     item.href === "/"
@@ -328,13 +387,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         key={item.href}
                         href={item.href}
                         target="_blank"
-                        className="flex items-center justify-between h-9 px-3 rounded-[8px] text-[14px] font-medium text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A] transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-between px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-all group"
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5 text-[#64748B]" />
+                          <Icon className="w-4 h-4 text-[#94A3B8] group-hover:text-[#2563EB] transition-colors" />
                           <span>{item.label}</span>
                         </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-[#94A3B8]" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#CBD5E1] group-hover:text-[#94A3B8]" />
                       </Link>
                     );
                   }
@@ -343,18 +403,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch={true}
+                      onClick={() => setMobileMenuOpen(false)}
+                      onMouseEnter={() => {
+                        router.prefetch(item.href);
+                        routePrewarmMap[item.href]?.forEach((url) => prewarmRoute(url));
+                      }}
                       className={cn(
-                        "flex items-center justify-between h-9 px-3 rounded-[8px] text-[14px] font-medium transition-colors select-none",
+                        "flex items-center justify-between px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium transition-all select-none",
                         isActive
-                          ? "bg-[#EFF6FF] text-[#1D4ED8] font-semibold"
-                          : "text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+                          ? "bg-[#F1F5F9] text-[#0F172A] font-bold shadow-xs"
+                          : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
                       )}
                     >
                       <div className="flex items-center gap-3">
                         <Icon
                           className={cn(
-                            "w-5 h-5",
-                            isActive ? "text-[#1D4ED8]" : "text-[#64748B]"
+                            "w-4 h-4 transition-colors",
+                            isActive ? "text-[#0F172A]" : "text-[#94A3B8]"
                           )}
                         />
                         <span>{item.label}</span>
@@ -367,88 +433,76 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        {user && (
-          <div className="p-3 border-t border-[#F1F5F9] shrink-0">
-            <div className="flex items-center justify-between p-2 rounded-[8px] bg-[#F8FAFC] border border-[#E2E8F0]">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#2563EB] font-bold text-[12px] flex items-center justify-center shrink-0">
-                  {user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-[#0F172A] truncate">
-                    {user.name}
-                  </div>
-                  <div className="text-[11px] text-[#64748B] truncate font-medium">
-                    {user.role}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                title="Se déconnecter"
-                className="w-7 h-7 flex items-center justify-center text-[#64748B] hover:text-[#DC2626] hover:bg-white rounded transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Bottom: Logout */}
+        <div className="pt-3 border-t border-[#F1F5F9] shrink-0">
+          <button
+            onClick={handleLogout}
+            title="Se déconnecter"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium text-[#94A3B8] hover:text-[#DC2626] hover:bg-[#FEF2F2]/60 transition-all group"
+          >
+            <LogOut className="w-4 h-4 text-[#94A3B8] group-hover:text-[#DC2626] transition-colors" />
+            <span>Déconnexion</span>
+          </button>
+        </div>
       </aside>
 
-      {/* 2. Main Wrapper with Topbar */}
-      <div className="flex-1 flex flex-col pl-[240px] min-w-0">
-        {/* Topbar (64px) */}
-        <header className="h-16 bg-white border-b border-[#E2E8F0] px-8 flex items-center justify-between sticky top-0 z-20">
-          <div className="text-[13px] font-medium text-[#64748B]">
-            {getBreadcrumbs()}
-          </div>
+      {/* 2. Right Floating Main Content Card */}
+      <div className="flex-1 bg-white rounded-[28px] border border-[#E2E8F0]/80 shadow-[0_10px_35px_rgba(15,23,42,0.035)] flex flex-col overflow-hidden min-w-0">
+        {/* Top Header inside Main Card */}
+        <header className="px-6 sm:px-8 py-3.5 flex items-center justify-between border-b border-[#F1F5F9] shrink-0 gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-1.5 text-[#64748B] hover:text-[#0F172A] rounded-lg hover:bg-[#F1F5F9]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
 
-          <div className="flex items-center gap-4">
-            {/* Global Live Search */}
-            <div ref={searchContainerRef} className="relative w-[300px]">
-              <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Recherche (adhérent, badge, formule)..."
-                value={searchQuery}
-                onFocus={() => {
-                  if (searchQuery.trim().length > 0) setIsSearchOpen(true);
-                }}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && searchQuery.trim()) {
-                    setIsSearchOpen(false);
-                    if (searchResults?.members && searchResults.members.length > 0) {
-                      router.push(`/members/${searchResults.members[0].id}`);
-                    } else {
-                      router.push(`/members?q=${encodeURIComponent(searchQuery.trim())}`);
-                    }
-                  } else if (e.key === "Escape") {
-                    setIsSearchOpen(false);
-                  }
-                }}
-                className="w-full h-9 pl-9 pr-8 bg-white border border-[#CBD5E1] rounded-[8px] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:ring-2 focus:ring-blue-50 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setIsSearchOpen(false);
+            {/* Inline Minimal Search */}
+            <div ref={searchContainerRef} className="relative flex-1 max-w-[340px]">
+              <div className="flex items-center text-[#94A3B8] focus-within:text-[#0F172A] transition-colors">
+                <Search className="w-4 h-4 mr-2.5 shrink-0 text-[#94A3B8]" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onFocus={() => {
+                    if (searchQuery.trim().length > 0) setIsSearchOpen(true);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#0F172A]"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchQuery.trim()) {
+                      setIsSearchOpen(false);
+                      if (searchResults?.members && searchResults.members.length > 0) {
+                        router.push(`/members/${searchResults.members[0].id}`);
+                      } else {
+                        router.push(`/members?q=${encodeURIComponent(searchQuery.trim())}`);
+                      }
+                    } else if (e.key === "Escape") {
+                      setIsSearchOpen(false);
+                    }
+                  }}
+                  className="w-full bg-transparent text-[13.5px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setIsSearchOpen(false);
+                    }}
+                    className="text-[#94A3B8] hover:text-[#0F172A] p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
               {/* Search Results Dropdown Palette */}
               {isSearchOpen && (
-                <div className="absolute top-11 left-0 w-[380px] bg-white rounded-[10px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute top-9 left-0 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
                   {isSearching ? (
                     <div className="p-4 text-center text-[13px] text-[#64748B]">
                       Recherche en cours...
@@ -480,7 +534,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     setIsSearchOpen(false);
                                     router.push(`/members/${m.id}`);
                                   }}
-                                  className="w-full text-left p-2 rounded-[6px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                  className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-7 h-7 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-[11px] shrink-0">
@@ -533,7 +587,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     router.push(`/cards?q=${encodeURIComponent(c.uid)}`);
                                   }
                                 }}
-                                className="w-full text-left p-2 rounded-[6px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
                               >
                                 <div className="flex items-center gap-2">
                                   <CreditCard className="w-4 h-4 text-[#64748B]" />
@@ -577,7 +631,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                   setIsSearchOpen(false);
                                   router.push("/plans");
                                 }}
-                                className="w-full text-left p-2 rounded-[6px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
                               >
                                 <div className="flex items-center gap-2">
                                   <Tags className="w-4 h-4 text-[#64748B]" />
@@ -615,28 +669,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
+          </div>
 
+          {/* Right: Notifications & Profile */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             {/* Notification Bell with Dropdown Popover */}
             <div ref={notifContainerRef} className="relative">
               <button
                 onClick={handleToggleNotif}
                 className={cn(
-                  "relative w-9 h-9 flex items-center justify-center rounded-[8px] transition-colors",
+                  "relative w-9 h-9 flex items-center justify-center rounded-full transition-colors",
                   isNotifOpen
-                    ? "bg-[#EFF6FF] text-[#2563EB]"
-                    : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                    ? "bg-[#F1F5F9] text-[#0F172A]"
+                    : "text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
                 )}
                 title="Notifications"
               >
-                <BellRing className="w-5 h-5" />
+                <BellRing className="w-4 h-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DC2626] rounded-full ring-2 ring-white" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#EA580C] rounded-full ring-2 ring-white" />
                 )}
               </button>
 
               {/* Popover Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 top-11 w-[380px] bg-white rounded-[12px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 top-11 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
                   {/* Popover Header */}
                   <div className="p-3.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -784,20 +841,94 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            <div className="w-[1px] h-6 bg-[#E2E8F0]" />
-
-            {/* User status */}
+            {/* User Profile Avatar - Peach / Terracotta matching screenshot with Dropdown */}
             {user && (
-              <div className="flex items-center gap-2 text-[13px]">
-                <div className="w-2 h-2 rounded-full bg-[#059669]" />
-                <span className="font-medium text-[#0F172A]">{user.username}</span>
+              <div ref={profileContainerRef} className="relative shrink-0">
+                <button
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  title={`${user.name} (${user.role})`}
+                  className={cn(
+                    "w-8 h-8 rounded-full bg-[#E5B69F] text-[#432314] font-bold text-[12px] flex items-center justify-center shadow-xs select-none cursor-pointer transition-all shrink-0 focus:outline-none",
+                    isProfileOpen ? "ring-2 ring-[#2563EB]/40 scale-105" : "hover:opacity-90"
+                  )}
+                >
+                  {user.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </button>
+
+                {/* Profile Dropdown Menu */}
+                {isProfileOpen && (
+                  <div className="absolute right-0 top-11 w-[240px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150 p-1.5">
+                    {/* User Identity Header */}
+                    <div className="p-3 bg-[#F8FAFC] rounded-[12px] mb-1">
+                      <div className="text-[13px] font-bold text-[#0F172A] truncate">
+                        {user.name}
+                      </div>
+                      <div className="text-[11px] text-[#64748B] truncate mt-0.5 font-mono">
+                        @{user.username}
+                      </div>
+                      <div className="mt-2">
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                          {user.role === "ADMIN"
+                            ? "Administrateur"
+                            : user.role === "MANAGER"
+                            ? "Responsable"
+                            : user.role === "RECEPTIONIST"
+                            ? "Réceptionniste"
+                            : user.role}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick navigation actions */}
+                    <div className="space-y-0.5 py-1">
+                      <Link
+                        href="/access"
+                        target="_blank"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#475569] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
+                      >
+                        <ScanLine className="w-4 h-4 text-[#64748B]" />
+                        <span>Borne d'accès</span>
+                      </Link>
+                      {user.role !== "RECEPTIONIST" && (
+                        <Link
+                          href="/settings"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#475569] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
+                        >
+                          <Settings className="w-4 h-4 text-[#64748B]" />
+                          <span>Paramètres</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    <div className="h-[1px] bg-[#F1F5F9] my-1" />
+
+                    {/* Logout button */}
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#DC2626] hover:bg-[#FEF2F2] transition-colors text-left"
+                    >
+                      <LogOut className="w-4 h-4 text-[#DC2626]" />
+                      <span>Se déconnecter</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </header>
 
-        {/* 3. Page Content Area */}
-        <main className="flex-1 p-6 max-w-[1280px] w-full mx-auto">
+        {/* 3. Page Content Area inside the Right Floating Card */}
+        <main className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-9 space-y-6">
           {children}
         </main>
       </div>

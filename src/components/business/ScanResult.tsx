@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, X } from "lucide-react";
+import { Check, X, AlertTriangle } from "lucide-react";
 import { ScanResult as ScanResultType } from "@/server/services/access-engine";
 import { formatDate } from "@/lib/dates";
 
@@ -10,6 +10,14 @@ interface ScanResultViewProps {
 
 export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset }) => {
   const isGranted = result.decision === "GRANTED";
+  const isExpiringSoon =
+    isGranted &&
+    Boolean(
+      result.member?.isExpiringSoon ||
+        (result.member?.daysRemaining !== undefined &&
+          result.member.daysRemaining <= 7 &&
+          result.member.daysRemaining >= 0)
+    );
 
   const reasonLabels: Record<string, string> = {
     CARD_NOT_FOUND: "Badge non reconnu",
@@ -21,19 +29,21 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
     OK: "Accès autorisé",
   };
 
+  const background = !isGranted
+    ? "linear-gradient(180deg, #DC2626 0%, #B91C1C 100%)"
+    : isExpiringSoon
+    ? "linear-gradient(180deg, #F59E0B 0%, #D97706 50%, #B45309 100%)"
+    : "linear-gradient(180deg, #059669 0%, #047857 100%)";
+
   return (
     <div
       role="alert"
       aria-live="assertive"
       onClick={onReset}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center p-8 text-white select-none cursor-pointer animate-in fade-in zoom-in-[0.96] duration-400"
-      style={{
-        background: isGranted
-          ? "linear-gradient(180deg, #059669 0%, #047857 100%)"
-          : "linear-gradient(180deg, #DC2626 0%, #B91C1C 100%)",
-      }}
+      style={{ background }}
     >
-      {/* Central Circle: Member photo if available, otherwise check/x icon */}
+      {/* Central Circle: Member photo if available, otherwise check/alert/x icon */}
       <div className="relative mb-6">
         <div className="w-36 h-36 rounded-full border-4 border-white/50 overflow-hidden shadow-2xl flex items-center justify-center bg-white/10 backdrop-blur-sm">
           {result.member?.photoUrl ? (
@@ -43,10 +53,12 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
               alt="Photo adhérent"
               className="w-full h-full object-cover"
             />
-          ) : isGranted ? (
-            <Check className="w-24 h-24 text-white stroke-[2.5]" />
-          ) : (
+          ) : !isGranted ? (
             <X className="w-24 h-24 text-white stroke-[2.5]" />
+          ) : isExpiringSoon ? (
+            <AlertTriangle className="w-24 h-24 text-white stroke-[2.5]" />
+          ) : (
+            <Check className="w-24 h-24 text-white stroke-[2.5]" />
           )}
         </div>
 
@@ -54,21 +66,31 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
         {result.member?.photoUrl && (
           <div
             className={`absolute bottom-0 right-0 w-11 h-11 rounded-full flex items-center justify-center border-2 border-white shadow-lg ${
-              isGranted ? "bg-[#059669]" : "bg-[#DC2626]"
+              !isGranted
+                ? "bg-[#DC2626]"
+                : isExpiringSoon
+                ? "bg-[#D97706]"
+                : "bg-[#059669]"
             }`}
           >
-            {isGranted ? (
-              <Check className="w-6 h-6 text-white stroke-[3]" />
-            ) : (
+            {!isGranted ? (
               <X className="w-6 h-6 text-white stroke-[3]" />
+            ) : isExpiringSoon ? (
+              <AlertTriangle className="w-6 h-6 text-white stroke-[2.5]" />
+            ) : (
+              <Check className="w-6 h-6 text-white stroke-[3]" />
             )}
           </div>
         )}
       </div>
 
       {/* Decision Big Heading */}
-      <div className="text-[28px] md:text-[36px] font-bold tracking-[0.08em] uppercase text-white/90 mb-4">
-        {isGranted ? "ACCÈS AUTORISÉ" : "ACCÈS REFUSÉ"}
+      <div className="text-[28px] md:text-[36px] font-bold tracking-[0.08em] uppercase text-white/90 mb-4 text-center">
+        {!isGranted
+          ? "ACCÈS REFUSÉ"
+          : isExpiringSoon
+          ? "ACCÈS AUTORISÉ · ÉCHÉANCE PROCHE"
+          : "ACCÈS AUTORISÉ"}
       </div>
 
       {isGranted && result.member ? (
@@ -84,9 +106,19 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
           </div>
 
           {/* Validity Pill */}
-          <div className="bg-white/20 backdrop-blur-md border border-white/30 px-6 py-2.5 rounded-full text-[16px] md:text-[18px] font-semibold text-white tracking-wide shadow-lg nums">
-            Échéance : {formatDate(result.member.endDate)} · {result.member.daysRemaining} jour
-            {result.member.daysRemaining > 1 ? "s" : ""}
+          <div
+            className={`backdrop-blur-md border px-6 py-2.5 rounded-full text-[16px] md:text-[18px] font-semibold text-white tracking-wide shadow-lg nums flex items-center gap-2 ${
+              isExpiringSoon
+                ? "bg-black/25 border-white/40"
+                : "bg-white/20 border-white/30"
+            }`}
+          >
+            {isExpiringSoon && <span>⚠️</span>}
+            <span>
+              Échéance : {formatDate(result.member.endDate)} · {result.member.daysRemaining} jour
+              {result.member.daysRemaining > 1 ? "s" : ""}
+              {isExpiringSoon ? " (À renouveler)" : ""}
+            </span>
           </div>
         </div>
       ) : (

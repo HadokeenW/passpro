@@ -104,17 +104,15 @@ export const QuickScanWidget: React.FC = () => {
         {/* Result presentation */}
         {result && (
           <div
-            className={`p-4 rounded-[8px] border transition-all duration-200 ${
-              isGranted
+            className={`p-4 rounded-[8px] border transition-all duration-200 ${isGranted
                 ? "bg-[#ECFDF5] border-[#A7F3D0] text-[#047857]"
                 : "bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]"
-            }`}
+              }`}
           >
             <div className="flex items-start gap-3">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                  isGranted ? "bg-[#059669] text-white" : "bg-[#DC2626] text-white"
-                }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isGranted ? "bg-[#059669] text-white" : "bg-[#DC2626] text-white"
+                  }`}
               >
                 {isGranted ? <Check className="w-5 h-5 stroke-[2.5]" /> : <X className="w-5 h-5 stroke-[2.5]" />}
               </div>

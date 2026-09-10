@@ -5,7 +5,7 @@ import Link from "next/link";
 import { KpiCard } from "@/components/business/KpiCard";
 import { Card } from "@/components/business/Card";
 import { Heatmap } from "@/components/business/Heatmap";
-import { QuickScanWidget } from "@/components/business/QuickScanWidget";
+import { DistributionDonutChart } from "@/components/business/DistributionDonutChart";
 import { StatusPill } from "@/components/business/StatusPill";
 import { Button } from "@/components/business/Button";
 import { formatMoney } from "@/lib/money";
@@ -22,6 +22,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+import { getCachedData, setCachedData } from "@/lib/cache";
+
 interface Metrics {
   activeMembers: number;
   expiringSoon: number;
@@ -30,13 +32,15 @@ interface Metrics {
   revenueToday: number;
   revenueMonth: number;
   blockedCards: number;
+  statusBreakdown?: { label: string; count: number; color: string }[];
+  planBreakdown?: { label: string; count: number; color: string }[];
 }
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [heatmapData, setHeatmapData] = useState<any>(null);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [metrics, setMetrics] = useState<Metrics | null>(() => getCachedData("/api/dashboard/metrics"));
+  const [heatmapData, setHeatmapData] = useState<any>(() => getCachedData("/api/dashboard/heatmap"));
+  const [recentLogs, setRecentLogs] = useState<any[]>(() => getCachedData("/api/dashboard/activity?limit=15") || []);
+  const [isLoading, setIsLoading] = useState(() => !getCachedData("/api/dashboard/metrics"));
 
   useEffect(() => {
     Promise.all([
@@ -45,9 +49,18 @@ export default function DashboardPage() {
       fetch("/api/dashboard/activity?limit=15").then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([m, h, a]) => {
-        if (m && !m.error) setMetrics(m);
-        if (h && !h.error && Array.isArray(h.buckets)) setHeatmapData(h);
-        if (Array.isArray(a)) setRecentLogs(a);
+        if (m && !m.error) {
+          setMetrics(m);
+          setCachedData("/api/dashboard/metrics", m);
+        }
+        if (h && !h.error && Array.isArray(h.buckets)) {
+          setHeatmapData(h);
+          setCachedData("/api/dashboard/heatmap", h);
+        }
+        if (Array.isArray(a)) {
+          setRecentLogs(a);
+          setCachedData("/api/dashboard/activity?limit=15", a);
+        }
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -72,60 +85,82 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 1. 6 KPI Cards Grid (3 x 2) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <KpiCard
-          label="Adhérents actifs"
-          value={metrics ? metrics.activeMembers : "—"}
-          context="À jour de cotisation"
-          icon={<Users className="w-5 h-5" />}
-          href="/members?filter=active"
-        />
-        <KpiCard
-          label="Expirent bientôt"
-          value={metrics ? metrics.expiringSoon : "—"}
-          context="Dans les 7 prochains jours"
-          variant="alert"
-          icon={<AlertCircle className="w-5 h-5" />}
-          href="/subscriptions?status=expiring"
-        />
-        <KpiCard
-          label="Abonnements expirés"
-          value={metrics ? metrics.expired : "—"}
-          context="À renouveler en caisse"
-          variant="alert"
-          icon={<CalendarX className="w-5 h-5" />}
-          href="/subscriptions?status=expired"
-        />
-        <KpiCard
-          label="Passages aujourd'hui"
-          value={metrics ? metrics.passagesToday : "—"}
-          context="Badges validés ou refusés"
-          icon={<ScanLine className="w-5 h-5" />}
-          href="/access-logs"
-        />
-        <KpiCard
-          label="Recettes du jour"
-          value={metrics ? formatMoney(metrics.revenueToday) : "—"}
-          context="Total encaissé aujourd'hui"
-          icon={<Coins className="w-5 h-5" />}
-          href="/payments?period=today"
-        />
-        <KpiCard
-          label="Recettes du mois"
-          value={metrics ? formatMoney(metrics.revenueMonth) : "—"}
-          context="Cumul du mois en cours"
-          icon={<TrendingUp className="w-5 h-5" />}
-          href="/payments?period=month"
-        />
+      {/* 1. Asymmetric Dynamic KPI Section: 1 Grand Hero + 5 Compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4.5 items-stretch">
+        {/* Grand Hero KPI Card (Left: 5 cols on desktop) */}
+        <div className="lg:col-span-5 flex">
+          <KpiCard
+            size="hero"
+            label="Adhérents actifs"
+            value={metrics ? metrics.activeMembers : "—"}
+            context="Adhérents avec formule et accès en règle à ce jour"
+            icon={<Users className="w-5 h-5" />}
+            href="/members?filter=active"
+            className="w-full h-full"
+          />
+        </div>
+
+        {/* 5 Compact Cards (Right: 7 cols on desktop) */}
+        <div className="lg:col-span-7 flex flex-col justify-between gap-3.5">
+          {/* Row 1: Daily Activity & Revenue (3 compact cards) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 flex-1">
+            <KpiCard
+              size="compact"
+              label="Passages aujourd'hui"
+              value={metrics ? metrics.passagesToday : "—"}
+              context="Scans borne du jour"
+              icon={<ScanLine className="w-4 h-4" />}
+              href="/access-logs"
+            />
+            <KpiCard
+              size="compact"
+              label="Recettes du jour"
+              value={metrics ? formatMoney(metrics.revenueToday) : "—"}
+              context="Caisse aujourd'hui"
+              icon={<Coins className="w-4 h-4" />}
+              href="/payments?period=today"
+            />
+            <KpiCard
+              size="compact"
+              label="Recettes du mois"
+              value={metrics ? formatMoney(metrics.revenueMonth) : "—"}
+              context="Cumul mensuel"
+              icon={<TrendingUp className="w-4 h-4" />}
+              href="/payments?period=month"
+            />
+          </div>
+
+          {/* Row 2: Renewal Alerts (2 compact cards) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 flex-1">
+            <KpiCard
+              size="compact"
+              label="Expirent bientôt"
+              value={metrics ? metrics.expiringSoon : "—"}
+              context="Sous les 7 prochains jours"
+              variant="alert"
+              icon={<AlertCircle className="w-4 h-4" />}
+              href="/subscriptions?status=expiring"
+            />
+            <KpiCard
+              size="compact"
+              label="Abonnements expirés"
+              value={metrics ? metrics.expired : "—"}
+              context="À renouveler au guichet"
+              variant="alert"
+              icon={<CalendarX className="w-4 h-4" />}
+              href="/subscriptions?status=expired"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* 2. Two Columns (2fr / 1fr): Heatmap & Quick Scan */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      {/* 2. Two Columns (2fr / 1fr): Heatmap & Distribution Donut Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="lg:col-span-2 flex">
           <Card
             title="Affluence — 28 derniers jours"
             subtitle="Distribution des passages par créneau de 2 heures"
+            className="w-full flex flex-col justify-between"
           >
             {heatmapData?.buckets ? (
               <Heatmap buckets={heatmapData.buckets} />
@@ -137,8 +172,18 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="lg:col-span-1">
-          <QuickScanWidget />
+        <div className="lg:col-span-1 flex">
+          <Card
+            title="Répartition des abonnements"
+            subtitle="Distribution par formule & état"
+            noPadding
+            className="w-full flex flex-col justify-between"
+          >
+            <DistributionDonutChart
+              statusData={metrics?.statusBreakdown || []}
+              planData={metrics?.planBreakdown || []}
+            />
+          </Card>
         </div>
       </div>
 

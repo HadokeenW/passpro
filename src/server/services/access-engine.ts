@@ -22,6 +22,7 @@ export interface ScanResult {
     startDate: string;
     endDate: string;
     daysRemaining: number;
+    isExpiringSoon?: boolean;
   } | null;
   kioskName: string;
   loggedAt: string;
@@ -213,6 +214,7 @@ export async function evaluateScan(
         startDate: sub.startDate.toISOString(),
         endDate: sub.endDate.toISOString(),
         daysRemaining,
+        isExpiringSoon: derived === "EXPIRING_SOON" || (daysRemaining <= 7 && daysRemaining >= 0),
       };
     }
   }

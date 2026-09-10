@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
-  serverExternalPackages: ["@prisma/client", "bcryptjs"]
+  reactStrictMode: false,
+  serverExternalPackages: ["@prisma/client", "bcryptjs"],
+  experimental: {
+    optimizePackageImports: ["lucide-react", "clsx", "tailwind-merge"],
+  },
 };
 
 export default nextConfig;

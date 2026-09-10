@@ -32,15 +32,46 @@ export async function GET(req: NextRequest) {
       where.createdAt = { gte: startOfMonth };
     }
 
-    // Summary calculation for the period
-    const allMatching = await prisma.payment.findMany({
-      where,
-      select: {
-        amount: true,
-        method: true,
-        operator: { select: { name: true } },
-      },
-    });
+    // Execute summary calculation and paginated payments concurrently
+    const [allMatching, payments] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        select: {
+          amount: true,
+          method: true,
+          operator: { select: { name: true } },
+        },
+      }),
+      prisma.payment.findMany({
+        where,
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          subscription: {
+            select: {
+              startDate: true,
+              endDate: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
     const count = allMatching.length;
     let totalAmount = 0;
 
@@ -62,35 +93,6 @@ export async function GET(req: NextRequest) {
       byOperator[opName].total += p.amount;
       byOperator[opName].count += 1;
     }
-
-    const payments = await prisma.payment.findMany({
-      where,
-      include: {
-        member: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        operator: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        subscription: {
-          select: {
-            startDate: true,
-            endDate: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
 
     return NextResponse.json({
       items: payments,

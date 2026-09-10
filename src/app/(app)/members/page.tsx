@@ -14,31 +14,46 @@ import { Users, UserPlus, ChevronLeft, ChevronRight, CreditCard, Download } from
 import { formatDate } from "@/lib/dates";
 import { downloadCsv } from "@/lib/csv";
 
+import { getCachedData, setCachedData } from "@/lib/cache";
+
 export default function MembersPage() {
   const router = useRouter();
-  const [members, setMembers] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const initialCacheKey = "/api/members?page=1&pageSize=15&filter=all&q=";
+  const initialData = getCachedData<any>(initialCacheKey);
+
+  const [members, setMembers] = useState<any[]>(() => initialData?.items || []);
+  const [total, setTotal] = useState(() => initialData?.total || 0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchMembers = () => {
-    setIsLoading(true);
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: "15",
       filter,
       q: search,
     });
+    const url = `/api/members?${params.toString()}`;
+    const cached = getCachedData<any>(url);
 
-    fetch(`/api/members?${params.toString()}`)
+    if (cached) {
+      setMembers(cached.items || []);
+      setTotal(cached.total || 0);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.items) {
           setMembers(data.items);
           setTotal(data.total);
+          setCachedData(url, data);
         }
       })
       .catch(console.error)

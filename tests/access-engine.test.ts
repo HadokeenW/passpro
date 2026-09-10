@@ -27,6 +27,7 @@ describe("Access Engine Evaluation Matrix", () => {
     expect(result.reason).toBe("OK");
     expect(result.member).not.toBeNull();
     expect(result.member?.daysRemaining).toBeLessThanOrEqual(7);
+    expect(result.member?.isExpiringSoon).toBe(true);
   });
 
   it("Scenario 3: Expired subscription -> DENIED (SUBSCRIPTION_EXPIRED)", async () => {

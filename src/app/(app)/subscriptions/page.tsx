@@ -21,31 +21,46 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/business/Toast";
 
+import { getCachedData, setCachedData } from "@/lib/cache";
+
 export default function SubscriptionsPage() {
   const toast = useToast();
-  const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const initialCacheKey = "/api/subscriptions?page=1&pageSize=15&status=all";
+  const initialData = getCachedData<any>(initialCacheKey);
+
+  const [subscriptions, setSubscriptions] = useState<any[]>(() => initialData?.items || []);
+  const [total, setTotal] = useState(() => initialData?.total || 0);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any | null>(null);
 
   const fetchSubscriptions = () => {
-    setIsLoading(true);
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: "15",
       status: statusFilter,
     });
+    const url = `/api/subscriptions?${params.toString()}`;
+    const cached = getCachedData<any>(url);
 
-    fetch(`/api/subscriptions?${params.toString()}`)
+    if (cached) {
+      setSubscriptions(cached.items || []);
+      setTotal(cached.total || 0);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.items) {
           setSubscriptions(data.items);
           setTotal(data.total);
+          setCachedData(url, data);
         }
       })
       .catch(console.error)

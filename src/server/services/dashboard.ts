@@ -1,71 +1,120 @@
 import { prisma } from "@/lib/db";
 import { deriveStatus } from "./subscriptions";
 
+let cachedMetrics: { data: any; expiresAt: number } | null = null;
+let cachedHeatmap: { data: any; expiresAt: number } | null = null;
+
+export function invalidateDashboardCache() {
+  cachedMetrics = null;
+  cachedHeatmap = null;
+}
+
 export async function getDashboardMetrics() {
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-
-  // 1. Members and their latest subscriptions
-  const members = await prisma.member.findMany({
-    where: { deletedAt: null },
-    include: {
-      subscriptions: {
-        orderBy: { endDate: "desc" },
-        take: 1,
-      },
-    },
-  });
-
-  let activeMembers = 0;
-  let expiringSoon = 0;
-  let expired = 0;
-
-  for (const m of members) {
-    const sub = m.subscriptions[0];
-    if (!sub) continue;
-    const status = deriveStatus(sub, now);
-    if (status === "ACTIVE") {
-      activeMembers++;
-    } else if (status === "EXPIRING_SOON") {
-      activeMembers++;
-      expiringSoon++;
-    } else if (status === "EXPIRED") {
-      expired++;
-    }
+  if (cachedMetrics && cachedMetrics.expiresAt > now.getTime()) {
+    return cachedMetrics.data;
   }
 
-  // 2. Passages today
-  const passagesToday = await prisma.accessLog.count({
-    where: {
-      createdAt: { gte: startOfToday },
-    },
-  });
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // 3. Revenue today
-  const paymentsToday = await prisma.payment.findMany({
-    where: {
-      createdAt: { gte: startOfToday },
-    },
-    select: { amount: true },
-  });
-  const revenueToday = paymentsToday.reduce((sum, p) => sum + p.amount, 0);
+  // Run queries concurrently with database indexing
+  const [
+    activeMembers,
+    expiringSoon,
+    expired,
+    passagesToday,
+    revenueTodayAgg,
+    revenueMonthAgg,
+    blockedCards,
+    plans,
+  ] = await Promise.all([
+    // Active members: have at least one active subscription valid today
+    prisma.member.count({
+      where: {
+        deletedAt: null,
+        subscriptions: {
+          some: {
+            status: "ACTIVE",
+            endDate: { gte: now },
+          },
+        },
+      },
+    }),
+    // Expiring soon: valid today but expiring within 7 days
+    prisma.member.count({
+      where: {
+        deletedAt: null,
+        subscriptions: {
+          some: {
+            status: "ACTIVE",
+            endDate: { gte: now, lte: in7Days },
+          },
+        },
+      },
+    }),
+    // Expired: has subscription but latest is expired, and no active subscription
+    prisma.member.count({
+      where: {
+        deletedAt: null,
+        subscriptions: {
+          some: {
+            endDate: { lt: now },
+          },
+          none: {
+            status: "ACTIVE",
+            endDate: { gte: now },
+          },
+        },
+      },
+    }),
+    prisma.accessLog.count({
+      where: { createdAt: { gte: startOfToday } },
+    }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { createdAt: { gte: startOfToday } },
+    }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { createdAt: { gte: startOfMonth } },
+    }),
+    prisma.card.count({
+      where: { status: "BLOCKED" },
+    }),
+    prisma.plan.findMany({
+      where: { active: true },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { subscriptions: true },
+        },
+      },
+      orderBy: { subscriptions: { _count: "desc" } },
+    }),
+  ]);
 
-  // 4. Revenue this month
-  const paymentsMonth = await prisma.payment.findMany({
-    where: {
-      createdAt: { gte: startOfMonth },
-    },
-    select: { amount: true },
-  });
-  const revenueMonth = paymentsMonth.reduce((sum, p) => sum + p.amount, 0);
+  const revenueToday = revenueTodayAgg._sum.amount || 0;
+  const revenueMonth = revenueMonthAgg._sum.amount || 0;
 
-  // 5. Blocked cards
-  const blockedCards = await prisma.card.count({
-    where: { status: "BLOCKED" },
-  });
+  const planColors = ["#2563EB", "#0EA5E9", "#6366F1", "#8B5CF6", "#EC4899", "#F59E0B"];
+  const planBreakdown = plans
+    .filter((p) => p._count.subscriptions > 0)
+    .map((p, idx) => ({
+      label: p.name,
+      count: p._count.subscriptions,
+      color: planColors[idx % planColors.length],
+    }));
 
-  return {
+  const statusBreakdown = [
+    { label: "Actifs", count: Math.max(0, activeMembers - expiringSoon), color: "#2563EB" },
+    { label: "Expirent sous 7j", count: expiringSoon, color: "#F59E0B" },
+    { label: "Expirés", count: expired, color: "#EF4444" },
+  ];
+
+  const result = {
     activeMembers,
     expiringSoon,
     expired,
@@ -73,7 +122,12 @@ export async function getDashboardMetrics() {
     revenueToday,
     revenueMonth,
     blockedCards,
+    statusBreakdown,
+    planBreakdown,
   };
+
+  cachedMetrics = { data: result, expiresAt: now.getTime() + 5000 };
+  return result;
 }
 
 export interface HeatmapBucket {
@@ -85,7 +139,12 @@ export interface HeatmapBucket {
 }
 
 export async function getHeatmapData(days: number = 28) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const nowMs = Date.now();
+  if (cachedHeatmap && cachedHeatmap.expiresAt > nowMs) {
+    return cachedHeatmap.data;
+  }
+
+  const since = new Date(nowMs - days * 24 * 60 * 60 * 1000);
   const logs = await prisma.accessLog.findMany({
     where: {
       createdAt: { gte: since },
@@ -106,12 +165,10 @@ export async function getHeatmapData(days: number = 28) {
 
   for (const log of logs) {
     const d = new Date(log.createdAt);
-    // getDay: 0 is Sun, 1 is Mon... convert so 0 is Mon, 6 is Sun
     const jsDay = d.getDay();
     const dayIndex = jsDay === 0 ? 6 : jsDay - 1;
 
     const hour = d.getHours();
-    // 06 to 24, then 00 to 06
     let slotIndex = 0;
     if (hour >= 6 && hour < 24) {
       slotIndex = Math.floor((hour - 6) / 2);
@@ -141,12 +198,15 @@ export async function getHeatmapData(days: number = 28) {
     }
   }
 
-  return {
+  const result = {
     buckets,
     peak,
     totalPassages: logs.length,
     daysCovered: days,
   };
+
+  cachedHeatmap = { data: result, expiresAt: nowMs + 15000 };
+  return result;
 }
 
 export async function getRecentActivity(limit: number = 20) {

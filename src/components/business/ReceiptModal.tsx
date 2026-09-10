@@ -83,12 +83,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           id="thermal-receipt"
           className="w-[280px] bg-white p-5 rounded-[4px] shadow-sm border border-[#CBD5E1] text-[#0F172A] font-sans text-[12px] flex flex-col gap-3 leading-relaxed"
         >
-          {/* Duplicata warning */}
-          {isDuplicate && (
-            <div className="text-center font-bold text-[12px] text-[#DC2626] border border-[#DC2626] py-0.5 rounded tracking-widest uppercase mb-1">
-              *** DUPLICATA ***
-            </div>
-          )}
+
 
           {/* Gym Header */}
           <div className="text-center">

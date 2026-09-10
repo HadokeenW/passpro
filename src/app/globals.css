@@ -9,35 +9,35 @@
     --primary-border: #BFDBFE;
     --primary-ring: #93C5FD;
 
-    --bg-page: #F6F8FB;
+    --bg-page: #EEF2F7;
     --surface: #FFFFFF;
-    --surface-alt: #F8FAFC;
-    --border: #E2E8F0;
-    --border-strong: #CBD5E1;
+    --surface-alt: #F8FAFD;
+    --border: #E5EBF2;
+    --border-strong: #D6E0EB;
 
-    --text: #0F172A;
-    --text-secondary: #475569;
-    --text-tertiary: #64748B;
-    --text-disabled: #94A3B8;
+    --text: #1E293B;
+    --text-secondary: #64748B;
+    --text-tertiary: #94A3B8;
+    --text-disabled: #CBD5E1;
 
-    --success: #059669;
+    --success: #10B981;
     --success-soft: #ECFDF5;
     --success-border: #A7F3D0;
 
-    --danger: #DC2626;
+    --danger: #EF4444;
     --danger-soft: #FEF2F2;
     --danger-border: #FECACA;
 
-    --warning: #D97706;
+    --warning: #F59E0B;
     --warning-soft: #FFFBEB;
     --warning-border: #FDE68A;
 
-    --grad-brand: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+    --grad-brand: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
 
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 10px;
-    --radius-xl: 12px;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 20px;
+    --radius-xl: 26px;
   }
 
   body {
@@ -67,6 +67,7 @@
     transform: scale(1);
     opacity: 0.5;
   }
+
   100% {
     transform: scale(1.18);
     opacity: 0;
@@ -81,6 +82,53 @@
   animation: radar-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite 1.2s;
 }
 
+/* Custom Sleek Modern Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Firefox standard thin scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+/* Scrollbar utilities */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 9999px;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
 /* Print Styles for 80mm Thermal Receipt */
 @media print {
   @page {
@@ -92,8 +140,10 @@
     visibility: hidden !important;
   }
 
-  #thermal-receipt, #thermal-receipt *,
-  #daily-report-receipt, #daily-report-receipt * {
+  #thermal-receipt,
+  #thermal-receipt *,
+  #daily-report-receipt,
+  #daily-report-receipt * {
     visibility: visible !important;
   }
 

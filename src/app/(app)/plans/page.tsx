@@ -8,21 +8,26 @@ import { Modal } from "@/components/business/Modal";
 import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
 import { Tags, Plus, Edit2, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { getCachedData, setCachedData } from "@/lib/cache";
 
 export default function PlansPage() {
   const toast = useToast();
-  const [plans, setPlans] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedPlans = getCachedData<any[]>("/api/plans?includeInactive=true");
+  const [plans, setPlans] = useState<any[]>(() => cachedPlans || []);
+  const [isLoading, setIsLoading] = useState(() => !cachedPlans);
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<any | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => getCachedData<any>("/api/auth/me")?.user || null);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => {
-        if (d?.user) setCurrentUser(d.user);
+        if (d?.user) {
+          setCurrentUser(d.user);
+          setCachedData("/api/auth/me", d);
+        }
       })
       .catch(console.error);
   }, []);
@@ -30,11 +35,21 @@ export default function PlansPage() {
   const canManagePlans = currentUser?.role === "ADMIN" || currentUser?.role === "MANAGER";
 
   const fetchPlans = () => {
-    setIsLoading(true);
+    const cached = getCachedData<any[]>("/api/plans?includeInactive=true");
+    if (cached) {
+      setPlans(cached);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
     fetch("/api/plans?includeInactive=true")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setPlans(data);
+        if (Array.isArray(data)) {
+          setPlans(data);
+          setCachedData("/api/plans?includeInactive=true", data);
+        }
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));

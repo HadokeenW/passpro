@@ -24,36 +24,52 @@ import {
   UserCheck,
 } from "lucide-react";
 
+import { getCachedData, setCachedData } from "@/lib/cache";
+
 export default function CardsPage() {
   const toast = useToast();
-  const [cards, setCards] = useState<any[]>([]);
-  const [counts, setCounts] = useState({ active: 0, blocked: 0, unassigned: 0, total: 0 });
-  const [total, setTotal] = useState(0);
+  const initialCacheKey = "/api/cards?page=1&pageSize=15&status=all&q=";
+  const initialData = getCachedData<any>(initialCacheKey);
+
+  const [cards, setCards] = useState<any[]>(() => initialData?.items || []);
+  const [counts, setCounts] = useState(() => initialData?.counts || { active: 0, blocked: 0, unassigned: 0, total: 0 });
+  const [total, setTotal] = useState(() => initialData?.total || 0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
 
   // Modals
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<string | null>(null);
 
   const fetchCards = () => {
-    setIsLoading(true);
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: "15",
       status: statusFilter,
       q: search,
     });
+    const url = `/api/cards?${params.toString()}`;
+    const cached = getCachedData<any>(url);
 
-    fetch(`/api/cards?${params.toString()}`)
+    if (cached) {
+      setCards(cached.items || []);
+      setTotal(cached.total || 0);
+      if (cached.counts) setCounts(cached.counts);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.items) {
           setCards(data.items);
           setTotal(data.total);
           if (data.counts) setCounts(data.counts);
+          setCachedData(url, data);
         }
       })
       .catch(console.error)

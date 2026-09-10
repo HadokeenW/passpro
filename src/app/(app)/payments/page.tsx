@@ -25,13 +25,18 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
+import { getCachedData, setCachedData } from "@/lib/cache";
+
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({ totalAmount: 0, count: 0 });
-  const [total, setTotal] = useState(0);
+  const initialCacheKey = "/api/payments?page=1&pageSize=15&period=today";
+  const initialData = getCachedData<any>(initialCacheKey);
+
+  const [payments, setPayments] = useState<any[]>(() => initialData?.items || []);
+  const [summary, setSummary] = useState<any>(() => initialData?.summary || { totalAmount: 0, count: 0 });
+  const [total, setTotal] = useState(() => initialData?.total || 0);
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState("today");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
 
   // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -39,20 +44,31 @@ export default function PaymentsPage() {
   const [receiptData, setReceiptData] = useState<any | null>(null);
 
   const fetchPayments = () => {
-    setIsLoading(true);
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: "15",
       period,
     });
+    const url = `/api/payments?${params.toString()}`;
+    const cached = getCachedData<any>(url);
 
-    fetch(`/api/payments?${params.toString()}`)
+    if (cached) {
+      setPayments(cached.items || []);
+      setTotal(cached.total || 0);
+      if (cached.summary) setSummary(cached.summary);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.items) {
           setPayments(data.items);
           setTotal(data.total);
           if (data.summary) setSummary(data.summary);
+          setCachedData(url, data);
         }
       })
       .catch(console.error)
