@@ -1,0 +1,409 @@
+import {
+  PrismaClient,
+  Role,
+  CardStatus,
+  PaymentMethod,
+  AccessDecision,
+  AccessReason,
+  AccessSource,
+  AlertLevel,
+  AlertType,
+} from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  if (process.env.SEED !== "true") {
+    console.log("SEED environment variable is not 'true', skipping seed.");
+    return;
+  }
+
+  console.log("Seeding database with WAL mode...");
+  await prisma.$queryRawUnsafe("PRAGMA journal_mode = WAL;");
+
+  // 1. Singleton Settings
+  await prisma.setting.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      gymName: "PASSPro Fitness Club",
+      gymPhone: "0550 12 34 56",
+      gymEmail: "contact@passpro.dz",
+      gymAddress: "14 Rue Didouche Mourad, Alger",
+      currency: "DA",
+      timezone: "Africa/Algiers",
+      dateFormat: "dd/MM/yyyy",
+      kioskName: "BORNE-01",
+      simulationMode: true,
+      receiptFooter: "Merci de votre fidélité et à bientôt !",
+    },
+  });
+
+  // 2. Users / Operators
+  const defaultPassword = await bcrypt.hash("passpro2026", 12);
+  const users = [
+    { username: "admin", name: "Administrateur", role: Role.ADMIN, active: true },
+    { username: "manager", name: "Responsable Salle", role: Role.MANAGER, active: true },
+    { username: "reception", name: "Inès Réception", role: Role.RECEPTIONIST, active: true },
+    { username: "borne", name: "Borne Entrée (Désactivé)", role: Role.ACCESS_GUARD, active: false },
+  ];
+
+  const createdUsers: Record<string, string> = {};
+  for (const u of users) {
+    const user = await prisma.user.upsert({
+      where: { username: u.username },
+      update: { name: u.name, role: u.role, active: u.active },
+      create: {
+        username: u.username,
+        name: u.name,
+        passwordHash: defaultPassword,
+        role: u.role,
+        active: u.active,
+      },
+    });
+    createdUsers[u.username] = user.id;
+  }
+
+  // 3. Plans
+  const plansData = [
+    { name: "Pass Journée", price: 500, durationDays: 1, sortOrder: 1, description: "Accès libre pour la journée" },
+    { name: "Semaine", price: 2000, durationDays: 7, sortOrder: 2, description: "Accès 7 jours consécutifs" },
+    { name: "Mensuel", price: 5500, durationDays: 30, sortOrder: 3, description: "Formule mensuelle standard" },
+    { name: "Trimestriel", price: 14000, durationDays: 90, sortOrder: 4, description: "Engagement 3 mois avantageux" },
+    { name: "Semestriel", price: 25000, durationDays: 180, sortOrder: 5, description: "Engagement 6 mois" },
+    { name: "Annuel", price: 45000, durationDays: 365, sortOrder: 6, description: "Accès illimité toute l'année" },
+  ];
+
+  const createdPlans: Record<string, string> = {};
+  for (const p of plansData) {
+    const existing = await prisma.plan.findFirst({ where: { name: p.name } });
+    if (existing) {
+      createdPlans[p.name] = existing.id;
+    } else {
+      const plan = await prisma.plan.create({ data: p });
+      createdPlans[p.name] = plan.id;
+    }
+  }
+
+  // 4. Members
+  const membersData = [
+    { firstName: "Amine", lastName: "Belkacem", phone: "0551 23 45 67", email: "amine.belkacem@gmail.com", notes: "Adhérent assidu" },
+    { firstName: "Karim", lastName: "Hadj", phone: "0661 34 56 78", email: "karim.hadj@outlook.com", notes: "Préfère les entraînements le soir" },
+    { firstName: "Yasmine", lastName: "Mansouri", phone: "0770 45 67 89", email: "yasmine.m@gmail.com", notes: "Cours collectifs" },
+    { firstName: "Sofiane", lastName: "Benali", phone: "0552 56 78 90", email: "sofiane.benali@yahoo.fr", notes: "" },
+    { firstName: "Lynda", lastName: "Khelifi", phone: "0662 67 89 01", email: "lynda.khelifi@gmail.com", notes: "Coach personnel demandé" },
+    { firstName: "Mehdi", lastName: "Bouzid", phone: "0771 78 90 12", email: "mehdi.b@hotmail.com", notes: "" },
+    { firstName: "Fatima Zohra", lastName: "Saidi", phone: "0553 89 01 23", email: "fz.saidi@gmail.com", notes: "" },
+    { firstName: "Omar", lastName: "Cherif", phone: "0663 90 12 34", email: "omar.cherif@gmail.com", notes: "" },
+    { firstName: "Samia", lastName: "Zerrouki", phone: "0772 01 23 45", email: "samia.z@yahoo.fr", notes: "" },
+    { firstName: "Walid", lastName: "Hamdi", phone: "0554 12 34 56", email: "walid.hamdi@gmail.com", notes: "" },
+    { firstName: "Selma", lastName: "Benaissa", phone: "0664 23 45 67", email: "selma.b@outlook.com", notes: "" },
+    { firstName: "Riad", lastName: "Meziane", phone: "0773 34 56 78", email: "riad.meziane@gmail.com", notes: "" },
+    { firstName: "Nadia", lastName: "Boussaid", phone: "0555 45 67 89", email: "nadia.b@gmail.com", notes: "" },
+    // Expiring soon (13, 14)
+    { firstName: "Khaled", lastName: "Zitouni", phone: "0774 67 89 01", email: "khaled.z@yahoo.fr", notes: "Rappeler pour renouvellement" },
+    { firstName: "Meriem", lastName: "Dahmani", phone: "0556 78 90 12", email: "meriem.d@gmail.com", notes: "" },
+    // Expired (15)
+    { firstName: "Bilel", lastName: "Taleb", phone: "0557 01 23 45", email: "bilel.taleb@gmail.com", notes: "Abonnement expiré" },
+    // Suspended (16)
+    { firstName: "Mourad", lastName: "Brahimi", phone: "0558 34 56 78", email: "mourad.b@gmail.com", notes: "Litige vestiaire en cours" },
+    // Others
+    { firstName: "Anis", lastName: "Ferhat", phone: "0666 89 01 23", email: "anis.ferhat@gmail.com", notes: "" },
+    { firstName: "Soraya", lastName: "Larbi", phone: "0775 90 12 34", email: "soraya.l@gmail.com", notes: "" },
+    { firstName: "Tarik", lastName: "Slimani", phone: "0665 56 78 90", email: "tarik.s@gmail.com", notes: "" },
+    // Blocked card holders (20 to 23)
+    { firstName: "Farid", lastName: "Guellil", phone: "0776 23 45 67", email: "farid.g@yahoo.fr", notes: "Badge égaré" },
+    { firstName: "Ines", lastName: "Mebarki", phone: "0667 12 34 56", email: "ines.m@gmail.com", notes: "Badge bloqué" },
+    { firstName: "Zineb", lastName: "Amrani", phone: "0668 45 67 89", email: "zineb.a@gmail.com", notes: "" },
+    { firstName: "Hamza", lastName: "Chikh", phone: "0777 56 78 90", email: "hamza.c@gmail.com", notes: "" },
+  ];
+
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const memberIds: string[] = [];
+
+  for (let i = 0; i < membersData.length; i++) {
+    const m = membersData[i];
+    const existing = await prisma.member.findFirst({
+      where: { firstName: m.firstName, lastName: m.lastName },
+    });
+
+    let memberId: string;
+    if (existing) {
+      memberId = existing.id;
+    } else {
+      const created = await prisma.member.create({ data: m });
+      memberId = created.id;
+    }
+    memberIds.push(memberId);
+
+    // Create subscriptions
+    const existingSub = await prisma.subscription.findFirst({ where: { memberId } });
+    if (!existingSub) {
+      if (i < 13) {
+        // Active
+        const planName = i % 2 === 0 ? "Mensuel" : "Trimestriel";
+        const duration = i % 2 === 0 ? 30 : 90;
+        const startDate = new Date(now.getTime() - 10 * dayMs);
+        const endDate = new Date(now.getTime() + (duration - 10) * dayMs);
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans[planName],
+            startDate,
+            endDate,
+            status: "ACTIVE",
+          },
+        });
+      } else if (i === 13) {
+        // Khaled: Expiring soon (2 days left)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 28 * dayMs),
+            endDate: new Date(now.getTime() + 2 * dayMs),
+            status: "ACTIVE",
+          },
+        });
+      } else if (i === 14) {
+        // Meriem: Expiring soon (5 days left)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 25 * dayMs),
+            endDate: new Date(now.getTime() + 5 * dayMs),
+            status: "ACTIVE",
+          },
+        });
+      } else if (i === 15) {
+        // Bilel: Expired (10 days ago)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 40 * dayMs),
+            endDate: new Date(now.getTime() - 10 * dayMs),
+            status: "EXPIRED",
+          },
+        });
+      } else if (i === 16) {
+        // Mourad: Suspended
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 15 * dayMs),
+            endDate: new Date(now.getTime() + 15 * dayMs),
+            status: "SUSPENDED",
+            suspendedAt: new Date(now.getTime() - 2 * dayMs),
+          },
+        });
+      } else if (i < 20) {
+        // Active
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 5 * dayMs),
+            endDate: new Date(now.getTime() + 25 * dayMs),
+            status: "ACTIVE",
+          },
+        });
+      }
+    }
+  }
+
+  // 5. RFID Cards (exact 30 UIDs)
+  const cardUids = [
+    // 20 Active cards (assigned to members 0 to 19)
+    "04:A3:2B:F1", "04:B4:3C:A2", "04:C5:4D:B3", "04:D6:5E:C4", "04:E7:6F:D5",
+    "04:09:81:F7", "04:1A:92:08", "04:3C:B4:2A", "04:4D:C5:3B", "04:6F:E7:5D",
+    "04:70:F8:6E", "04:81:09:7F", "04:92:1A:80",
+    "04:F8:70:E6", // index 13 -> Khaled (Expiring soon)
+    "04:A3:2B:91", // index 14 -> Meriem (Expiring soon)
+    "04:2B:A3:19", // index 15 -> Bilel (Expired)
+    "04:5E:D6:4C", // index 16 -> Mourad (Suspended)
+    "04:B4:3C:92", "04:C5:4D:93", "04:D6:5E:94",
+    // 4 Blocked cards (assigned to members 20 to 23)
+    "04:EE:11:22", "04:FF:33:44", "04:AA:55:66", "04:BB:77:88",
+    // 6 Unassigned stock cards
+    "04:00:AA:11", "04:00:BB:22", "04:00:CC:33", "04:00:DD:44", "04:00:EE:55", "04:00:FF:66",
+  ];
+
+  for (let i = 0; i < cardUids.length; i++) {
+    const uid = cardUids[i];
+    let memberId: string | null = null;
+    let status: CardStatus = CardStatus.UNASSIGNED;
+
+    if (i < 20) {
+      memberId = memberIds[i];
+      status = CardStatus.ACTIVE;
+    } else if (i >= 20 && i < 24) {
+      memberId = memberIds[i];
+      status = CardStatus.BLOCKED;
+    } else {
+      memberId = null;
+      status = CardStatus.UNASSIGNED;
+    }
+
+    await prisma.card.upsert({
+      where: { uid },
+      update: { memberId, status },
+      create: {
+        uid,
+        memberId,
+        status,
+        lastSeenAt: i < 20 ? new Date(now.getTime() - (i + 1) * 3600 * 1000) : null,
+      },
+    });
+  }
+
+  // 6. Payments & Receipt Counter (35 payments)
+  const existingPayments = await prisma.payment.count();
+  if (existingPayments === 0) {
+    const operatorId = createdUsers["reception"] || createdUsers["admin"];
+    const planKeys = ["Pass Journée", "Semaine", "Mensuel", "Trimestriel", "Semestriel", "Annuel"];
+    const methods: PaymentMethod[] = ["CASH", "CASH", "CARD", "CASH", "OTHER"];
+
+    for (let seq = 1; seq <= 35; seq++) {
+      const receiptNumber = `REC-2026-${seq.toString().padStart(4, "0")}`;
+      const memberId = memberIds[(seq - 1) % memberIds.length];
+      const planName = planKeys[seq % planKeys.length];
+      const plan = plansData.find((p) => p.name === planName)!;
+      const daysAgo = Math.floor((35 - seq) * 0.8);
+      const createdAt = new Date(now.getTime() - daysAgo * dayMs - (seq * 37) * 60 * 1000);
+
+      await prisma.payment.create({
+        data: {
+          receiptNumber,
+          memberId,
+          planId: createdPlans[planName],
+          planName: plan.name,
+          amount: plan.price,
+          method: methods[seq % methods.length],
+          operatorId,
+          createdAt,
+        },
+      });
+    }
+
+    await prisma.counter.upsert({
+      where: { key: "receipt-2026" },
+      update: { value: 35 },
+      create: { key: "receipt-2026", value: 35 },
+    });
+  }
+
+  // 7. AccessLogs (~400 logs)
+  const existingLogs = await prisma.accessLog.count();
+  if (existingLogs === 0) {
+    console.log("Generating ~400 realistic access logs...");
+    const logsToCreate = [];
+
+    for (let day = 0; day < 28; day++) {
+      const dayDate = new Date(now.getTime() - day * dayMs);
+      const passagesCount = 12 + Math.floor(Math.random() * 8);
+
+      for (let p = 0; p < passagesCount; p++) {
+        const rnd = Math.random() * 100;
+        let hour = 18;
+        if (rnd < 20) hour = 7 + Math.floor(Math.random() * 3);
+        else if (rnd < 40) hour = 12 + Math.floor(Math.random() * 3);
+        else if (rnd < 85) hour = 17 + Math.floor(Math.random() * 4);
+        else hour = 21 + Math.floor(Math.random() * 2);
+
+        const minute = Math.floor(Math.random() * 60);
+        const second = Math.floor(Math.random() * 60);
+        const logDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), hour, minute, second);
+
+        const isRefusal = Math.random() < 0.12;
+
+        if (!isRefusal) {
+          const activeCardIndex = Math.floor(Math.random() * 13);
+          const uid = cardUids[activeCardIndex];
+          const mId = memberIds[activeCardIndex];
+
+          logsToCreate.push({
+            cardUid: uid,
+            memberId: mId,
+            decision: AccessDecision.GRANTED,
+            reason: AccessReason.OK,
+            kioskName: "BORNE-01",
+            source: AccessSource.SIMULATION,
+            createdAt: logDate,
+          });
+        } else {
+          logsToCreate.push({
+            cardUid: "04:DE:AD:BE:EF",
+            memberId: null,
+            decision: AccessDecision.DENIED,
+            reason: AccessReason.CARD_NOT_FOUND,
+            kioskName: "BORNE-01",
+            source: AccessSource.SIMULATION,
+            createdAt: logDate,
+          });
+        }
+      }
+    }
+
+    for (let i = 0; i < logsToCreate.length; i += 100) {
+      const chunk = logsToCreate.slice(i, i + 100);
+      await prisma.accessLog.createMany({ data: chunk });
+    }
+  }
+
+  // 8. Alerts
+  const existingAlerts = await prisma.alert.count();
+  if (existingAlerts === 0) {
+    const alertsData = [
+      {
+        level: AlertLevel.DANGER,
+        type: AlertType.BLOCKED_CARD,
+        title: "Badge bloqué présenté",
+        message: "Un badge bloqué (04:EE:11:22) a été refusé à la borne",
+        read: false,
+        memberId: memberIds[20],
+        cardUid: "04:EE:11:22",
+        createdAt: new Date(now.getTime() - 25 * 60 * 1000),
+      },
+      {
+        level: AlertLevel.DANGER,
+        type: AlertType.UNKNOWN_CARD,
+        title: "Badge inconnu détecté",
+        message: "Un badge non répertorié (04:DE:AD:BE:EF) a tenté de passer",
+        read: false,
+        cardUid: "04:DE:AD:BE:EF",
+        createdAt: new Date(now.getTime() - 2 * 3600 * 1000),
+      },
+      {
+        level: AlertLevel.WARNING,
+        type: AlertType.EXPIRING_SUBSCRIPTION,
+        title: "Échéance dans 2 jours",
+        message: "L'abonnement de Khaled Zitouni expire le 12/09/2026",
+        read: false,
+        memberId: memberIds[13],
+        createdAt: new Date(now.getTime() - 4 * 3600 * 1000),
+      },
+    ];
+
+    for (const a of alertsData) {
+      await prisma.alert.create({ data: a });
+    }
+  }
+
+  console.log("Seeding completed successfully with WAL mode!");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

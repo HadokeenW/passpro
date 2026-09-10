@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Administration ────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  RECEPTIONIST
+  ACCESS_GUARD
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  name         String
+  passwordHash String
+  role         Role       @default(RECEPTIONIST)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  payments     Payment[]
+  auditLogs    AuditLog[]
+}
+
+model Setting {
+  id             Int      @id @default(1)
+  gymName        String   @default("PASSPro")
+  gymPhone       String   @default("")
+  gymEmail       String   @default("")
+  gymAddress     String   @default("")
+  currency       String   @default("DA")
+  timezone       String   @default("Africa/Algiers")
+  dateFormat     String   @default("dd/MM/yyyy")
+  kioskName      String   @default("BORNE-01")
+  simulationMode Boolean  @default(true)
+  receiptFooter  String   @default("Merci de votre fidélité")
+  updatedAt      DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  before     String?
+  after      String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ─── Adhérents & formules ──────────────────────────────────────────
+
+model Member {
+  id            String        @id @default(cuid())
+  firstName     String
+  lastName      String
+  phone         String?
+  email         String?
+  photoUrl      String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+  subscriptions Subscription[]
+  cards         Card[]
+  payments      Payment[]
+  accessLogs    AccessLog[]
+  alerts        Alert[]
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String
+  price         Int
+  durationDays  Int
+  description   String?
+  active        Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  subscriptions Subscription[]
+  payments      Payment[]
+}
+
+// ─── Abonnements ───────────────────────────────────────────────────
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  member      Member             @relation(fields: [memberId], references: [id])
+  memberId    String
+  plan        Plan               @relation(fields: [planId], references: [id])
+  planId      String
+  startDate   DateTime
+  endDate     DateTime
+  status      SubscriptionStatus @default(ACTIVE)
+  suspendedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  payments    Payment[]
+
+  @@index([endDate])
+  @@index([memberId, status])
+}
+
+// ─── Cartes RFID ───────────────────────────────────────────────────
+
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  UNASSIGNED
+}
+
+model Card {
+  uid        String      @id
+  member     Member?     @relation(fields: [memberId], references: [id])
+  memberId   String?
+  status     CardStatus  @default(UNASSIGNED)
+  lastSeenAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([memberId])
+}
+
+// ─── Caisse ────────────────────────────────────────────────────────
+
+enum PaymentMethod {
+  CASH
+  CARD
+  OTHER
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  receiptNumber  String        @unique
+  member         Member        @relation(fields: [memberId], references: [id])
+  memberId       String
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?
+  plan           Plan?         @relation(fields: [planId], references: [id])
+  planId         String?
+  planName       String
+  amount         Int
+  method         PaymentMethod @default(CASH)
+  operator       User?         @relation(fields: [operatorId], references: [id])
+  operatorId     String?
+  createdAt      DateTime      @default(now())
+
+  @@index([createdAt])
+}
+
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
+
+// ─── Contrôle d'accès & alertes ────────────────────────────────────
+
+enum AccessDecision {
+  GRANTED
+  DENIED
+}
+
+enum AccessReason {
+  OK
+  CARD_NOT_FOUND
+  CARD_BLOCKED
+  CARD_UNASSIGNED
+  NO_ACTIVE_SUBSCRIPTION
+  SUBSCRIPTION_EXPIRED
+  SUBSCRIPTION_SUSPENDED
+}
+
+enum AccessSource {
+  HARDWARE
+  SIMULATION
+}
+
+model AccessLog {
+  id        String         @id @default(cuid())
+  cardUid   String
+  member    Member?        @relation(fields: [memberId], references: [id])
+  memberId  String?
+  decision  AccessDecision
+  reason    AccessReason
+  kioskName String         @default("BORNE-01")
+  source    AccessSource   @default(SIMULATION)
+  createdAt DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([cardUid, createdAt])
+}
+
+enum AlertLevel {
+  INFO
+  WARNING
+  DANGER
+}
+
+enum AlertType {
+  EXPIRING_SUBSCRIPTION
+  EXPIRED_SUBSCRIPTION
+  UNKNOWN_CARD
+  BLOCKED_CARD
+}
+
+model Alert {
+  id        String     @id @default(cuid())
+  level     AlertLevel @default(INFO)
+  type      AlertType
+  title     String
+  message   String
+  read      Boolean    @default(false)
+  member    Member?    @relation(fields: [memberId], references: [id])
+  memberId  String?
+  cardUid   String?
+  createdAt DateTime   @default(now())
+
+  @@index([read, createdAt])
+}

@@ -1,0 +1,10 @@
+{
+  "/api/notifications/route": "app/api/notifications/route.js",
+  "/api/members/route": "app/api/members/route.js",
+  "/(app)/page": "app/(app)/page.js",
+  "/(app)/access-logs/page": "app/(app)/access-logs/page.js",
+  "/(app)/subscriptions/page": "app/(app)/subscriptions/page.js",
+  "/(app)/settings/page": "app/(app)/settings/page.js",
+  "/(app)/members/[id]/page": "app/(app)/members/[id]/page.js",
+  "/(app)/members/page": "app/(app)/members/page.js"
+}
