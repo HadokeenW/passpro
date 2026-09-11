@@ -29,10 +29,10 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
             key={opt.value}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "h-7 px-3.5 rounded-full text-[13px] font-medium transition-all duration-120 select-none flex items-center gap-1.5 cursor-pointer",
+              "h-7 px-3.5 rounded-full text-[13px] font-medium transition-all duration-150 ease-out select-none flex items-center gap-1.5 cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[#2563EB]/40 outline-none",
               isActive
                 ? "bg-white text-[#2563EB] shadow-xs font-semibold"
-                : "text-[#64748B] hover:text-[#0F172A]"
+                : "text-[#64748B] hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
             <span>{opt.label}</span>

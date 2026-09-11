@@ -5,6 +5,7 @@ import {
   AccessSource,
   AlertLevel,
   AlertType,
+  PlanType,
 } from "@prisma/client";
 import { deriveStatus } from "./subscriptions";
 import { daysBetween } from "@/lib/dates";
@@ -19,10 +20,17 @@ export interface ScanResult {
     lastName: string;
     photoUrl?: string | null;
     planName: string;
+    planType?: PlanType;
     startDate: string;
     endDate: string;
     daysRemaining: number;
     isExpiringSoon?: boolean;
+    hasDebt?: boolean;
+    balanceDue?: number;
+    remainingSessions?: number | null;
+    totalSessions?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
   } | null;
   kioskName: string;
   loggedAt: string;
@@ -175,6 +183,9 @@ export async function evaluateScan(
       alertMsg = `L'adhérent ${member.firstName} ${member.lastName} n'a aucun abonnement`;
     } else {
       const derived = deriveStatus(sub, now);
+      const effectivePlanType = sub.planType || sub.plan.planType;
+      const startTime = sub.startTime || sub.plan.startTime;
+      const endTime = sub.endTime || sub.plan.endTime;
 
       if (sub.status === "SUSPENDED") {
         decision = "DENIED";
@@ -184,12 +195,38 @@ export async function evaluateScan(
         alertTitle = "Abonnement suspendu";
         alertMsg = `Abonnement suspendu pour ${member.firstName} ${member.lastName}`;
       } else if (derived === "EXPIRED") {
-        decision = "DENIED";
-        reason = "SUBSCRIPTION_EXPIRED";
-        alertLevel = "WARNING";
-        alertType = "EXPIRED_SUBSCRIPTION";
-        alertTitle = "Abonnement expiré";
-        alertMsg = `Abonnement expiré pour ${member.firstName} ${member.lastName} depuis le ${sub.endDate.toLocaleDateString("fr-FR")}`;
+        if (effectivePlanType === "SESSIONS" && sub.remainingSessions !== null && sub.remainingSessions <= 0) {
+          decision = "DENIED";
+          reason = "SESSIONS_EXHAUSTED";
+          alertLevel = "WARNING";
+          alertType = "EXPIRED_SUBSCRIPTION";
+          alertTitle = "Séances épuisées";
+          alertMsg = `Toutes les séances de l'adhérent ${member.firstName} ${member.lastName} ont été consommées`;
+        } else {
+          decision = "DENIED";
+          reason = "SUBSCRIPTION_EXPIRED";
+          alertLevel = "WARNING";
+          alertType = "EXPIRED_SUBSCRIPTION";
+          alertTitle = "Abonnement expiré";
+          alertMsg = `Abonnement expiré pour ${member.firstName} ${member.lastName} depuis le ${sub.endDate.toLocaleDateString("fr-FR")}`;
+        }
+      } else if (effectivePlanType === "TIME_SLOT" && startTime && endTime) {
+        // Time slot verification (HH:mm format)
+        const currentHours = now.getHours().toString().padStart(2, "0");
+        const currentMinutes = now.getMinutes().toString().padStart(2, "0");
+        const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+        if (currentTimeStr < startTime || currentTimeStr > endTime) {
+          decision = "DENIED";
+          reason = "OUTSIDE_TIME_WINDOW";
+          alertLevel = "WARNING";
+          alertType = "EXPIRED_SUBSCRIPTION";
+          alertTitle = "Hors créneau horaire";
+          alertMsg = `Accès refusé : la formule de ${member.firstName} ${member.lastName} est autorisée de ${startTime} à ${endTime} (actuellement ${currentTimeStr})`;
+        } else {
+          decision = "GRANTED";
+          reason = "OK";
+        }
       } else {
         // ACTIVE or EXPIRING_SOON -> Access GRANTED
         decision = "GRANTED";
@@ -204,17 +241,36 @@ export async function evaluateScan(
         }
       }
 
+      // If granted and SESSIONS plan, decrement remainingSessions by 1
+      let updatedRemainingSessions = sub.remainingSessions;
+      if (decision === "GRANTED" && effectivePlanType === "SESSIONS" && sub.remainingSessions !== null && sub.remainingSessions > 0) {
+        updatedRemainingSessions = sub.remainingSessions - 1;
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: { remainingSessions: { decrement: 1 } },
+        });
+      }
+
       const daysRemaining = daysBetween(now, sub.endDate);
+      const balanceDue = sub.balanceDue || 0;
+
       memberPayload = {
         id: member.id,
         firstName: member.firstName,
         lastName: member.lastName,
         photoUrl: member.photoUrl,
         planName: sub.plan.name,
+        planType: effectivePlanType,
         startDate: sub.startDate.toISOString(),
         endDate: sub.endDate.toISOString(),
         daysRemaining,
         isExpiringSoon: derived === "EXPIRING_SOON" || (daysRemaining <= 7 && daysRemaining >= 0),
+        hasDebt: balanceDue > 0,
+        balanceDue,
+        remainingSessions: updatedRemainingSessions,
+        totalSessions: sub.totalSessions ?? sub.plan.sessionCount ?? null,
+        startTime,
+        endTime,
       };
     }
   }

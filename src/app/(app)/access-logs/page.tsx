@@ -55,6 +55,17 @@ export default function AccessLogsPage() {
 
   useEffect(() => {
     fetchLogs();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("access"))) {
+        fetchLogs();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, decision, search]);
 
   const decisionOptions = [

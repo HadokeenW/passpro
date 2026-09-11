@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
       ];
     } else if (statusFilter === "suspended") {
       where.status = "SUSPENDED";
+    } else if (statusFilter === "debt") {
+      where.balanceDue = { gt: 0 };
     }
 
     const [total, subscriptions] = await Promise.all([
@@ -56,6 +58,7 @@ export async function GET(req: NextRequest) {
 
     const paginated = subscriptions.map((sub) => {
       const details = getSubscriptionDetails(sub, now);
+      const balanceDue = sub.balanceDue || 0;
       return {
         id: sub.id,
         memberId: sub.memberId,
@@ -69,9 +72,19 @@ export async function GET(req: NextRequest) {
         plan: {
           id: sub.plan.id,
           name: sub.plan.name,
-          price: sub.plan.price,
+          planType: sub.planType,
+          price: sub.price || sub.plan.price,
           durationDays: sub.plan.durationDays,
         },
+        planType: sub.planType,
+        price: sub.price || sub.plan.price,
+        paidAmount: sub.paidAmount,
+        balanceDue,
+        hasDebt: balanceDue > 0,
+        remainingSessions: sub.remainingSessions,
+        totalSessions: sub.totalSessions,
+        startTime: sub.startTime,
+        endTime: sub.endTime,
         startDate: sub.startDate,
         endDate: sub.endDate,
         storedStatus: sub.status,

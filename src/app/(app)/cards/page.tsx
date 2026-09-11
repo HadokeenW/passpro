@@ -24,7 +24,7 @@ import {
   UserCheck,
 } from "lucide-react";
 
-import { getCachedData, setCachedData } from "@/lib/cache";
+import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
 
 export default function CardsPage() {
   const toast = useToast();
@@ -78,6 +78,17 @@ export default function CardsPage() {
 
   useEffect(() => {
     fetchCards();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("card"))) {
+        fetchCards();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, statusFilter, search]);
 
   const handleToggleBlock = async (uid: string, currentStatus: string) => {
@@ -89,6 +100,7 @@ export default function CardsPage() {
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
+        invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
         toast.success(
           action === "BLOCK" ? "Badge bloqué" : "Badge débloqué",
           `Le badge ${uid} a été mis à jour`
@@ -107,6 +119,7 @@ export default function CardsPage() {
         method: "DELETE",
       });
       if (res.ok) {
+        invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
         toast.success("Badge retiré", `Le badge ${cardToDelete} a été sorti du parc`);
         fetchCards();
       }

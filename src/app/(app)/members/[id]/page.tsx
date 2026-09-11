@@ -16,6 +16,7 @@ import { Modal } from "@/components/business/Modal";
 import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
 import { formatDate, formatDateTime } from "@/lib/dates";
+import { invalidateCache } from "@/lib/cache";
 import {
   CreditCard,
   RefreshCw,
@@ -65,6 +66,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isDebtSettlementModal, setIsDebtSettlementModal] = useState(false);
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -99,6 +101,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: internalNotes }),
       });
+      invalidateCache(["/api/members", "/api/dashboard"]);
       toast.success("Notes sauvegardées", "Les modifications sont enregistrées");
     } catch (err) {
       console.error(err);
@@ -114,6 +117,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
+        invalidateCache(["/api/cards", "/api/members", "/api/dashboard"]);
         toast.success(
           action === "BLOCK" ? "Badge bloqué" : "Badge débloqué",
           `Le badge ${cardUid} est désormais ${action === "BLOCK" ? "bloqué" : "actif"}`
@@ -132,6 +136,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         method: "POST",
       });
       if (res.ok) {
+        invalidateCache(["/api/subscriptions", "/api/members", "/api/dashboard"]);
         toast.success(
           isSuspended ? "Abonnement réactivé" : "Abonnement suspendu",
           `Le statut a été mis à jour`
@@ -147,6 +152,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     try {
       const res = await fetch(`/api/members/${id}`, { method: "DELETE" });
       if (res.ok) {
+        invalidateCache(["/api/members", "/api/dashboard", "/api/subscriptions", "/api/cards"]);
         toast.success("Adhérent archivé", "Le dossier a été archivé");
         setIsDeleteModalOpen(false);
         router.push("/members");
@@ -168,6 +174,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({ photoUrl }),
       });
       if (res.ok) {
+        invalidateCache(["/api/members", "/api/dashboard"]);
         toast.success("Photo mise à jour", "La photo d'identité est enregistrée");
         fetchDossier();
       } else {
@@ -259,6 +266,11 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       : currentSubscription?.status || "NO_SUBSCRIPTION"
                   }
                 />
+                {currentSubscription?.balanceDue > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
+                    ⚠️ Reste à payer : {formatMoney(currentSubscription.balanceDue)}
+                  </span>
+                )}
               </div>
               <p className="text-[13px] text-[#64748B] mt-1">
                 Tél : <span className="font-medium text-[#0F172A]">{member.phone || "—"}</span> · Email :{" "}
@@ -288,6 +300,19 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               Modifier
             </Button>
 
+            {currentSubscription?.balanceDue > 0 && (
+              <Button
+                variant="danger"
+                size="md"
+                onClick={() => {
+                  setIsDebtSettlementModal(true);
+                  setIsPaymentModalOpen(true);
+                }}
+              >
+                Régler la dette ({formatMoney(currentSubscription.balanceDue)})
+              </Button>
+            )}
+
             {currentSubscription && (
               <Button
                 variant={currentSubscription.storedStatus === "SUSPENDED" ? "secondary" : "danger-soft"}
@@ -314,7 +339,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               variant="primary"
               size="md"
               leftIcon={<RefreshCw className="w-4 h-4" />}
-              onClick={() => setIsPaymentModalOpen(true)}
+              onClick={() => {
+                setIsDebtSettlementModal(false);
+                setIsPaymentModalOpen(true);
+              }}
             >
               Renouveler
             </Button>
@@ -332,15 +360,88 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-[20px] font-bold text-[#0F172A]">
-                      {currentSubscription.planName}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[20px] font-bold text-[#0F172A]">
+                        {currentSubscription.planName}
+                      </h3>
+                      {currentSubscription.planType === "SESSIONS" && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                          🎟️ Formule par séances
+                        </span>
+                      )}
+                      {currentSubscription.planType === "TIME_SLOT" && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
+                          🕒 Formule heure exacte
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[13px] text-[#64748B] mt-0.5">
-                      Tarif standard : {formatMoney(currentSubscription.planPrice)} · {currentSubscription.durationDays} jours
+                      Tarif formule : {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · {currentSubscription.durationDays} jours
+                      {currentSubscription.planType === "TIME_SLOT" && currentSubscription.startTime && currentSubscription.endTime && (
+                        <span> · Horaires autorisés : <strong className="text-[#0F172A]">{currentSubscription.startTime} à {currentSubscription.endTime}</strong></span>
+                      )}
                     </div>
                   </div>
                   <StatusPill status={currentSubscription.status} />
                 </div>
+
+                {/* Debt Callout */}
+                {currentSubscription.balanceDue > 0 && (
+                  <div className="p-3.5 bg-[#FEF2F2] border border-[#FECACA] rounded-[8px] flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[20px]">⚠️</span>
+                      <div>
+                        <div className="text-[13px] font-bold text-[#991B1B]">
+                          Crédit accordé — Reste à payer : {formatMoney(currentSubscription.balanceDue)}
+                        </div>
+                        <div className="text-[11px] text-[#B91C1C]">
+                          Total souscription : {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · Déjà réglé : {formatMoney(currentSubscription.paidAmount || 0)}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setIsDebtSettlementModal(true);
+                        setIsPaymentModalOpen(true);
+                      }}
+                    >
+                      Régler le solde ({formatMoney(currentSubscription.balanceDue)})
+                    </Button>
+                  </div>
+                )}
+
+                {/* Sessions Counter if SESSIONS plan */}
+                {currentSubscription.planType === "SESSIONS" && (
+                  <div className="p-3.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[8px]">
+                    <div className="flex justify-between items-center text-[13px] mb-1.5 font-semibold text-[#1E40AF]">
+                      <span>Séances disponibles :</span>
+                      <span className="nums text-[15px] font-bold">
+                        {currentSubscription.remainingSessions ?? 0} / {currentSubscription.totalSessions ?? 10}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-[#DBEAFE] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#2563EB] transition-all"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              ((currentSubscription.remainingSessions ?? 0) /
+                                (currentSubscription.totalSessions || 10)) *
+                                100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-[#3B82F6] mt-1.5">
+                      Décompté automatiquement d'1 séance à chaque passage au contrôle d'accès.
+                    </p>
+                  </div>
+                )}
 
                 <SubscriptionProgress
                   startDate={currentSubscription.startDate}
@@ -555,8 +656,15 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       {/* Payment & Renewal Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        preselectedMember={member}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setIsDebtSettlementModal(false);
+        }}
+        preselectedMember={{
+          ...member,
+          currentSubscription,
+        }}
+        initialDebtSettlement={isDebtSettlementModal}
         onPaymentSuccess={(payId) => {
           fetchDossier();
           fetch(`/api/payments/${payId}`)

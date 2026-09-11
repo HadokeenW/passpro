@@ -1,4 +1,4 @@
-// File: C:\Users\Click\Downloads\New folder (3)\passpro\src\app\api\dashboard\activity\route.ts
+// File: C:\Users\ELITEBOOK\Documents\passpro2\src\app\api\dashboard\activity\route.ts
 import * as entry from '../../../../../../src/app/api/dashboard/activity/route.js'
 import type { NextRequest } from 'next/server.js'
 

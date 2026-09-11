@@ -5,6 +5,7 @@ import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { useToast } from "./Toast";
 import { Radio, CreditCard, Sparkles, CheckCircle2 } from "lucide-react";
+import { invalidateCache } from "@/lib/cache";
 
 interface CardAssignModalProps {
   isOpen: boolean;
@@ -93,6 +94,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
         toast.success("Badge enregistré", `Le badge ${cleanUid} a été enregistré`);
       }
 
+      invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
       onSuccess();
       onClose();
     } catch (err: any) {

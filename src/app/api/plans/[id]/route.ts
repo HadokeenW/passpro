@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       throw new ApiError("NOT_FOUND", "Formule introuvable", 404);
     }
 
-    const { name, price, durationDays, description, active, sortOrder } = body;
+    const { name, price, durationDays, description, active, sortOrder, planType, sessionCount, startTime, endTime } = body;
 
     const updated = await prisma.plan.update({
       where: { id },
@@ -30,6 +30,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         description: description !== undefined ? (description ? description.trim() : null) : undefined,
         active: active !== undefined ? Boolean(active) : undefined,
         sortOrder: sortOrder !== undefined ? parseInt(sortOrder, 10) : undefined,
+        planType: planType !== undefined ? planType : undefined,
+        sessionCount: sessionCount !== undefined ? (sessionCount ? parseInt(sessionCount, 10) : null) : undefined,
+        startTime: startTime !== undefined ? (startTime ? startTime.trim() : null) : undefined,
+        endTime: endTime !== undefined ? (endTime ? endTime.trim() : null) : undefined,
       },
     });
 
@@ -39,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       entityType: "Plan",
       entityId: id,
       before: { name: existing.name, price: existing.price, active: existing.active },
-      after: { name: updated.name, price: updated.price, active: updated.active },
+      after: { name: updated.name, price: updated.price, active: updated.active, planType: updated.planType },
     });
 
     return NextResponse.json(updated);

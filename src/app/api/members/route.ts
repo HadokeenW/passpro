@@ -49,6 +49,12 @@ export async function GET(req: NextRequest) {
           status: "BLOCKED",
         },
       };
+    } else if (filter === "debt") {
+      where.subscriptions = {
+        some: {
+          balanceDue: { gt: 0 },
+        },
+      };
     }
 
     const [total, members] = await Promise.all([
@@ -74,6 +80,7 @@ export async function GET(req: NextRequest) {
       const status = latestSub ? deriveStatus(latestSub, now) : "NO_SUBSCRIPTION";
       const activeCard = m.cards.find((c) => c.status === "ACTIVE");
       const blockedCard = m.cards.find((c) => c.status === "BLOCKED");
+      const balanceDue = latestSub?.balanceDue || 0;
 
       return {
         id: m.id,
@@ -87,9 +94,16 @@ export async function GET(req: NextRequest) {
           ? {
               id: latestSub.id,
               planName: latestSub.plan.name,
+              planType: latestSub.planType,
               status,
               startDate: latestSub.startDate,
               endDate: latestSub.endDate,
+              balanceDue,
+              hasDebt: balanceDue > 0,
+              remainingSessions: latestSub.remainingSessions,
+              totalSessions: latestSub.totalSessions,
+              startTime: latestSub.startTime,
+              endTime: latestSub.endTime,
             }
           : null,
         card: activeCard

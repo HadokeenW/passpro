@@ -68,19 +68,26 @@ async function main() {
 
   // 3. Plans
   const plansData = [
-    { name: "Pass Journée", price: 500, durationDays: 1, sortOrder: 1, description: "Accès libre pour la journée" },
-    { name: "Semaine", price: 2000, durationDays: 7, sortOrder: 2, description: "Accès 7 jours consécutifs" },
-    { name: "Mensuel", price: 5500, durationDays: 30, sortOrder: 3, description: "Formule mensuelle standard" },
-    { name: "Trimestriel", price: 14000, durationDays: 90, sortOrder: 4, description: "Engagement 3 mois avantageux" },
-    { name: "Semestriel", price: 25000, durationDays: 180, sortOrder: 5, description: "Engagement 6 mois" },
-    { name: "Annuel", price: 45000, durationDays: 365, sortOrder: 6, description: "Accès illimité toute l'année" },
+    { name: "Pass Journée", price: 500, durationDays: 1, sortOrder: 1, description: "Accès libre pour la journée", planType: "TEMPORAL" as const },
+    { name: "Semaine", price: 2000, durationDays: 7, sortOrder: 2, description: "Accès 7 jours consécutifs", planType: "TEMPORAL" as const },
+    { name: "Mensuel", price: 5500, durationDays: 30, sortOrder: 3, description: "Formule mensuelle standard", planType: "TEMPORAL" as const },
+    { name: "Trimestriel", price: 14000, durationDays: 90, sortOrder: 4, description: "Engagement 3 mois avantageux", planType: "TEMPORAL" as const },
+    { name: "Semestriel", price: 25000, durationDays: 180, sortOrder: 5, description: "Engagement 6 mois", planType: "TEMPORAL" as const },
+    { name: "Annuel", price: 45000, durationDays: 365, sortOrder: 6, description: "Accès illimité toute l'année", planType: "TEMPORAL" as const },
+    { name: "Carnet 10 Séances", price: 6000, durationDays: 90, sortOrder: 7, description: "10 entrées valables 90 jours", planType: "SESSIONS" as const, sessionCount: 10 },
+    { name: "Carnet 20 Séances", price: 10000, durationDays: 180, sortOrder: 8, description: "20 entrées valables 180 jours", planType: "SESSIONS" as const, sessionCount: 20 },
+    { name: "Heures Creuses (13h-16h)", price: 3500, durationDays: 30, sortOrder: 9, description: "Accès de 13h00 à 16h00 chaque jour", planType: "TIME_SLOT" as const, startTime: "13:00", endTime: "16:00" },
   ];
 
   const createdPlans: Record<string, string> = {};
   for (const p of plansData) {
     const existing = await prisma.plan.findFirst({ where: { name: p.name } });
     if (existing) {
-      createdPlans[p.name] = existing.id;
+      const updated = await prisma.plan.update({
+        where: { id: existing.id },
+        data: p,
+      });
+      createdPlans[p.name] = updated.id;
     } else {
       const plan = await prisma.plan.create({ data: p });
       createdPlans[p.name] = plan.id;
@@ -98,10 +105,10 @@ async function main() {
     { firstName: "Fatima Zohra", lastName: "Saidi", phone: "0553 89 01 23", email: "fz.saidi@gmail.com", notes: "" },
     { firstName: "Omar", lastName: "Cherif", phone: "0663 90 12 34", email: "omar.cherif@gmail.com", notes: "" },
     { firstName: "Samia", lastName: "Zerrouki", phone: "0772 01 23 45", email: "samia.z@yahoo.fr", notes: "" },
-    { firstName: "Walid", lastName: "Hamdi", phone: "0554 12 34 56", email: "walid.hamdi@gmail.com", notes: "" },
-    { firstName: "Selma", lastName: "Benaissa", phone: "0664 23 45 67", email: "selma.b@outlook.com", notes: "" },
-    { firstName: "Riad", lastName: "Meziane", phone: "0773 34 56 78", email: "riad.meziane@gmail.com", notes: "" },
-    { firstName: "Nadia", lastName: "Boussaid", phone: "0555 45 67 89", email: "nadia.b@gmail.com", notes: "" },
+    { firstName: "Walid", lastName: "Hamdi", phone: "0554 12 34 56", email: "walid.hamdi@gmail.com", notes: "Paiement en crédit (reste 2 000 DA)" },
+    { firstName: "Selma", lastName: "Benaissa", phone: "0664 23 45 67", email: "selma.b@outlook.com", notes: "Carnet 10 séances (7 restantes)" },
+    { firstName: "Riad", lastName: "Meziane", phone: "0773 34 56 78", email: "riad.meziane@gmail.com", notes: "Créneau Heures Creuses (13h-16h)" },
+    { firstName: "Nadia", lastName: "Boussaid", phone: "0555 45 67 89", email: "nadia.b@gmail.com", notes: "Carnet épuisé (0 séance)" },
     // Expiring soon (13, 14)
     { firstName: "Khaled", lastName: "Zitouni", phone: "0774 67 89 01", email: "khaled.z@yahoo.fr", notes: "Rappeler pour renouvellement" },
     { firstName: "Meriem", lastName: "Dahmani", phone: "0556 78 90 12", email: "meriem.d@gmail.com", notes: "" },
@@ -134,6 +141,7 @@ async function main() {
     let memberId: string;
     if (existing) {
       memberId = existing.id;
+      await prisma.member.update({ where: { id: memberId }, data: { notes: m.notes } });
     } else {
       const created = await prisma.member.create({ data: m });
       memberId = created.id;
@@ -143,8 +151,8 @@ async function main() {
     // Create subscriptions
     const existingSub = await prisma.subscription.findFirst({ where: { memberId } });
     if (!existingSub) {
-      if (i < 13) {
-        // Active
+      if (i < 9) {
+        // Active standard
         const planName = i % 2 === 0 ? "Mensuel" : "Trimestriel";
         const duration = i % 2 === 0 ? 30 : 90;
         const startDate = new Date(now.getTime() - 10 * dayMs);
@@ -156,6 +164,74 @@ async function main() {
             startDate,
             endDate,
             status: "ACTIVE",
+            price: i % 2 === 0 ? 5500 : 14000,
+            paidAmount: i % 2 === 0 ? 5500 : 14000,
+            balanceDue: 0,
+          },
+        });
+      } else if (i === 9) {
+        // Walid Hamdi: Credit / Reste à payer (Formule 5500, acompte 3500, reste 2000)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Mensuel"],
+            startDate: new Date(now.getTime() - 5 * dayMs),
+            endDate: new Date(now.getTime() + 25 * dayMs),
+            status: "ACTIVE",
+            price: 5500,
+            paidAmount: 3500,
+            balanceDue: 2000,
+          },
+        });
+      } else if (i === 10) {
+        // Selma Benaissa: Carnet 10 Séances (7 restantes)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Carnet 10 Séances"],
+            startDate: new Date(now.getTime() - 10 * dayMs),
+            endDate: new Date(now.getTime() + 80 * dayMs),
+            status: "ACTIVE",
+            planType: "SESSIONS",
+            totalSessions: 10,
+            remainingSessions: 7,
+            price: 6000,
+            paidAmount: 6000,
+            balanceDue: 0,
+          },
+        });
+      } else if (i === 11) {
+        // Riad Meziane: Heures Creuses (13h-16h)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Heures Creuses (13h-16h)"],
+            startDate: new Date(now.getTime() - 8 * dayMs),
+            endDate: new Date(now.getTime() + 22 * dayMs),
+            status: "ACTIVE",
+            planType: "TIME_SLOT",
+            startTime: "13:00",
+            endTime: "16:00",
+            price: 3500,
+            paidAmount: 3500,
+            balanceDue: 0,
+          },
+        });
+      } else if (i === 12) {
+        // Nadia Boussaid: Carnet 10 Séances épuisé (0 restante)
+        await prisma.subscription.create({
+          data: {
+            memberId,
+            planId: createdPlans["Carnet 10 Séances"],
+            startDate: new Date(now.getTime() - 20 * dayMs),
+            endDate: new Date(now.getTime() + 70 * dayMs),
+            status: "EXPIRED",
+            planType: "SESSIONS",
+            totalSessions: 10,
+            remainingSessions: 0,
+            price: 6000,
+            paidAmount: 6000,
+            balanceDue: 0,
           },
         });
       } else if (i === 13) {

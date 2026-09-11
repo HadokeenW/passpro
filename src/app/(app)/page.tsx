@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const [recentLogs, setRecentLogs] = useState<any[]>(() => getCachedData("/api/dashboard/activity?limit=15") || []);
   const [isLoading, setIsLoading] = useState(() => !getCachedData("/api/dashboard/metrics"));
 
-  useEffect(() => {
+  const fetchDashboardData = () => {
     Promise.all([
       fetch("/api/dashboard/metrics").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/dashboard/heatmap").then((r) => (r.ok ? r.json() : null)),
@@ -64,6 +64,21 @@ export default function DashboardPage() {
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("dashboard"))) {
+        fetchDashboardData();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, []);
 
   return (

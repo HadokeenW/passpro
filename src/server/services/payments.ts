@@ -6,12 +6,14 @@ import { withAudit } from "./audit";
 
 export interface CreatePaymentParams {
   memberId: string;
-  planId: string;
+  planId?: string;
   subscriptionId?: string;
   mode?: RenewalMode;
   method?: PaymentMethod;
   operatorId?: string;
   customAmount?: number;
+  totalPrice?: number;
+  isDebtSettlement?: boolean;
 }
 
 export async function processPayment({
@@ -22,6 +24,8 @@ export async function processPayment({
   method = "CASH",
   operatorId,
   customAmount,
+  totalPrice,
+  isDebtSettlement = false,
 }: CreatePaymentParams) {
   const currentYear = new Date().getFullYear();
   const counterKey = `receipt-${currentYear}`;
@@ -34,6 +38,7 @@ export async function processPayment({
         subscriptions: {
           orderBy: { endDate: "desc" },
           take: 1,
+          include: { plan: true },
         },
       },
     });
@@ -42,7 +47,77 @@ export async function processPayment({
       throw new ApiError("NOT_FOUND", "Adhérent introuvable", 404);
     }
 
-    // 2. Verify Plan
+    const now = new Date();
+
+    // 2. Handle Debt Settlement Mode
+    if (isDebtSettlement) {
+      let targetSub = subscriptionId
+        ? await tx.subscription.findUnique({ where: { id: subscriptionId }, include: { plan: true } })
+        : member.subscriptions[0] || null;
+
+      if (!targetSub) {
+        throw new ApiError("NOT_FOUND", "Abonnement introuvable pour ce règlement de dette", 404);
+      }
+
+      if (targetSub.balanceDue <= 0) {
+        throw new ApiError("BAD_REQUEST", "Cet abonnement n'a aucun solde restant dû", 400);
+      }
+
+      const amountToPay = customAmount !== undefined ? customAmount : targetSub.balanceDue;
+      if (amountToPay <= 0) {
+        throw new ApiError("VALIDATION_ERROR", "Le montant réglé doit être supérieur à 0", 400);
+      }
+
+      const newPaidAmount = targetSub.paidAmount + amountToPay;
+      const newBalanceDue = Math.max(0, targetSub.balanceDue - amountToPay);
+
+      const updatedSub = await tx.subscription.update({
+        where: { id: targetSub.id },
+        data: {
+          paidAmount: newPaidAmount,
+          balanceDue: newBalanceDue,
+        },
+      });
+
+      // Increment Receipt Counter
+      const counter = await tx.counter.upsert({
+        where: { key: counterKey },
+        update: { value: { increment: 1 } },
+        create: { key: counterKey, value: 1 },
+      });
+
+      const sequence = counter.value.toString().padStart(4, "0");
+      const receiptNumber = `REC-${currentYear}-${sequence}`;
+
+      const createdPayment = await tx.payment.create({
+        data: {
+          receiptNumber,
+          memberId: member.id,
+          subscriptionId: updatedSub.id,
+          planId: targetSub.planId,
+          planName: `${targetSub.plan.name} (Règlement solde)`,
+          amount: amountToPay,
+          totalAmount: targetSub.price || targetSub.plan.price,
+          remainingBalance: newBalanceDue,
+          paymentType: "DEBT_PAYMENT",
+          method,
+          operatorId: operatorId || null,
+        },
+        include: {
+          member: true,
+          operator: true,
+          subscription: true,
+        },
+      });
+
+      return createdPayment;
+    }
+
+    // 3. Regular Subscription or Renewal Mode
+    if (!planId) {
+      throw new ApiError("VALIDATION_ERROR", "Formule requise pour une souscription", 400);
+    }
+
     const plan = await tx.plan.findUnique({
       where: { id: planId },
     });
@@ -51,16 +126,25 @@ export async function processPayment({
       throw new ApiError("NOT_FOUND", "Formule introuvable", 404);
     }
 
-    // 3. Determine target subscription
+    // Calculate final prices and amounts
+    const finalTotalPrice = totalPrice !== undefined ? totalPrice : plan.price;
+    const paidAmountThisTime = customAmount !== undefined ? customAmount : finalTotalPrice;
+    const balanceDue = Math.max(0, finalTotalPrice - paidAmountThisTime);
+
+    // Determine target subscription
     let targetSub = subscriptionId
       ? await tx.subscription.findUnique({ where: { id: subscriptionId } })
       : member.subscriptions[0] || null;
 
     let finalSubId: string;
-    const now = new Date();
+
+    // Attributes based on plan type
+    const sessionCount = plan.planType === "SESSIONS" ? (plan.sessionCount || 10) : null;
+    const startTime = plan.planType === "TIME_SLOT" ? (plan.startTime || null) : null;
+    const endTime = plan.planType === "TIME_SLOT" ? (plan.endTime || null) : null;
 
     if (targetSub) {
-      // Calculate renewal dates
+      // Renewal
       const { startDate, endDate } = calculateRenewalDates(
         targetSub,
         plan.durationDays,
@@ -76,6 +160,14 @@ export async function processPayment({
           endDate,
           status: "ACTIVE",
           suspendedAt: null,
+          planType: plan.planType,
+          totalSessions: sessionCount,
+          remainingSessions: sessionCount,
+          startTime,
+          endTime,
+          price: finalTotalPrice,
+          paidAmount: paidAmountThisTime,
+          balanceDue,
         },
       });
       finalSubId = updatedSub.id;
@@ -89,12 +181,20 @@ export async function processPayment({
           startDate,
           endDate,
           status: "ACTIVE",
+          planType: plan.planType,
+          totalSessions: sessionCount,
+          remainingSessions: sessionCount,
+          startTime,
+          endTime,
+          price: finalTotalPrice,
+          paidAmount: paidAmountThisTime,
+          balanceDue,
         },
       });
       finalSubId = createdSub.id;
     }
 
-    // 4. Increment Receipt Counter
+    // Increment Receipt Counter
     const counter = await tx.counter.upsert({
       where: { key: counterKey },
       update: { value: { increment: 1 } },
@@ -104,16 +204,18 @@ export async function processPayment({
     const sequence = counter.value.toString().padStart(4, "0");
     const receiptNumber = `REC-${currentYear}-${sequence}`;
 
-    // 5. Create Payment record
-    const amount = customAmount !== undefined ? customAmount : plan.price;
-    const payment = await tx.payment.create({
+    // Create Payment record
+    const createdPayment = await tx.payment.create({
       data: {
         receiptNumber,
         memberId: member.id,
         subscriptionId: finalSubId,
         planId: plan.id,
-        planName: plan.name, // Denormalized for receipt permanence
-        amount,
+        planName: plan.name,
+        amount: paidAmountThisTime,
+        totalAmount: finalTotalPrice,
+        remainingBalance: balanceDue,
+        paymentType: "SUBSCRIPTION",
         method,
         operatorId: operatorId || null,
       },
@@ -124,18 +226,20 @@ export async function processPayment({
       },
     });
 
-    return payment;
+    return createdPayment;
   });
 
-  // 6. Audit after commit
+  // Audit after commit
   await withAudit({
     userId: operatorId,
-    action: "payment.create",
+    action: isDebtSettlement ? "payment.debt_settlement" : "payment.create",
     entityType: "Payment",
     entityId: payment.id,
     after: {
       receiptNumber: payment.receiptNumber,
       amount: payment.amount,
+      totalAmount: payment.totalAmount,
+      remainingBalance: payment.remainingBalance,
       planName: payment.planName,
       memberId: payment.memberId,
       method: payment.method,

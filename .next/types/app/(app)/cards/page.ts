@@ -1,4 +1,4 @@
-// File: C:\Users\Click\Downloads\New folder (3)\passpro\src\app\(app)\cards\page.tsx
+// File: C:\Users\ELITEBOOK\Documents\passpro2\src\app\(app)\cards\page.tsx
 import * as entry from '../../../../../src/app/(app)/cards/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

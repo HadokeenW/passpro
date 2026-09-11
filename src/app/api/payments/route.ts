@@ -116,10 +116,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);
     const body = await req.json();
-    const { memberId, planId, subscriptionId, mode, method, customAmount } = body;
+    const { memberId, planId, subscriptionId, mode, method, customAmount, totalPrice, isDebtSettlement } = body;
 
-    if (!memberId || !planId) {
-      throw new ApiError("VALIDATION_ERROR", "Adhérent et formule requis", 400);
+    if (!memberId) {
+      throw new ApiError("VALIDATION_ERROR", "Adhérent requis", 400);
+    }
+
+    if (!isDebtSettlement && !planId) {
+      throw new ApiError("VALIDATION_ERROR", "Formule requise", 400);
     }
 
     const payment = await processPayment({
@@ -130,6 +134,8 @@ export async function POST(req: NextRequest) {
       method,
       operatorId: user.id,
       customAmount,
+      totalPrice,
+      isDebtSettlement: Boolean(isDebtSettlement),
     });
 
     return NextResponse.json(payment, { status: 201 });

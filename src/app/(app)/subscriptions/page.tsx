@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/business/EmptyState";
 import { PaymentModal } from "@/components/business/PaymentModal";
 import { ReceiptModal } from "@/components/business/ReceiptModal";
 import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import {
   CalendarCheck,
   ChevronLeft,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/business/Toast";
 
-import { getCachedData, setCachedData } from "@/lib/cache";
+import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
 
 export default function SubscriptionsPage() {
   const toast = useToast();
@@ -69,6 +70,17 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     fetchSubscriptions();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("subscription"))) {
+        fetchSubscriptions();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, statusFilter]);
 
   const handleToggleSuspend = async (sub: any) => {
@@ -77,6 +89,7 @@ export default function SubscriptionsPage() {
     try {
       const res = await fetch(`/api/subscriptions/${sub.id}/${action}`, { method: "POST" });
       if (res.ok) {
+        invalidateCache(["/api/subscriptions", "/api/dashboard", "/api/members"]);
         toast.success(
           isSuspended ? "Abonnement réactivé" : "Abonnement suspendu",
           `Le statut de ${sub.member.firstName} a été actualisé`
@@ -121,6 +134,7 @@ export default function SubscriptionsPage() {
     { label: "Expirent bientôt", value: "expiring" },
     { label: "Expirés", value: "expired" },
     { label: "Suspendus", value: "suspended" },
+    { label: "Avec reste à payer", value: "debt" },
   ];
 
   return (
@@ -189,7 +203,30 @@ export default function SubscriptionsPage() {
                         {s.member.firstName} {s.member.lastName}
                       </Link>
                     </td>
-                    <td className="px-4 text-[#0F172A] font-medium">{s.plan.name}</td>
+                    <td className="px-4">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 font-medium text-[#0F172A]">
+                          <span>{s.plan.name}</span>
+                          {s.planType === "SESSIONS" && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                              🎟️ {s.remainingSessions ?? 0} séanc.
+                            </span>
+                          )}
+                          {s.planType === "TIME_SLOT" && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
+                              🕒 {s.startTime || "13h"}-{s.endTime || "16h"}
+                            </span>
+                          )}
+                        </div>
+                        {s.balanceDue > 0 && (
+                          <div>
+                            <span className="text-[11px] font-bold px-1.5 py-0.2 rounded bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
+                              Reste : {formatMoney(s.balanceDue)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 text-[#64748B] nums">{formatDate(s.startDate)}</td>
                     <td className="px-4 text-[#64748B] nums">{formatDate(s.endDate)}</td>
                     <td className="px-4 font-semibold nums">

@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { ScanResult } from "@/server/services/access-engine";
 import { ScanLine, Check, X, ShieldAlert } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 
 export const QuickScanWidget: React.FC = () => {
   const [uid, setUid] = useState("");
@@ -117,31 +118,66 @@ export const QuickScanWidget: React.FC = () => {
                 {isGranted ? <Check className="w-5 h-5 stroke-[2.5]" /> : <X className="w-5 h-5 stroke-[2.5]" />}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-bold uppercase tracking-wide">
-                  {isGranted ? "ACCÈS AUTORISÉ" : "ACCÈS REFUSÉ"}
-                </div>
-
-                {result.member ? (
-                  <div className="mt-1">
-                    <div className="text-[14px] font-semibold text-[#0F172A]">
-                      {result.member.firstName} {result.member.lastName}
-                    </div>
-                    <div className="text-[12px] text-[#475569]">
-                      {result.member.planName} · Échéance {formatDate(result.member.endDate)} (
-                      {result.member.daysRemaining} j restants)
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold uppercase tracking-wide">
+                    {isGranted ? "ACCÈS AUTORISÉ" : "ACCÈS REFUSÉ"}
                   </div>
-                ) : (
-                  <div className="text-[13px] font-medium mt-1">
-                    Motif : {result.reason}
-                  </div>
-                )}
 
-                <div className="text-[11px] font-mono-code text-[#64748B] mt-1">
-                  UID: {result.cardUid}
+                  {result.member ? (
+                    <div className="mt-1 space-y-1">
+                      <div className="text-[14px] font-semibold text-[#0F172A]">
+                        {result.member.firstName} {result.member.lastName}
+                      </div>
+                      <div className="text-[12px] text-[#475569]">
+                        {result.member.planName} · Échéance {formatDate(result.member.endDate)} (
+                        {result.member.daysRemaining} j restants)
+                      </div>
+
+                      {result.member.planType === "SESSIONS" && (
+                        <div className="text-[11px] font-semibold text-[#1E40AF]">
+                          🎟️ Séance décomptée · {result.member.remainingSessions ?? 0} restante(s) sur {result.member.totalSessions ?? 10}
+                        </div>
+                      )}
+
+                      {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
+                        <div className="text-[11px] font-semibold text-[#D97706]">
+                          🕒 Créneau autorisé : {result.member.startTime} à {result.member.endTime}
+                        </div>
+                      )}
+
+                      {result.member.hasDebt && result.member.balanceDue && (
+                        <div className="inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
+                          ⚠️ Attention : Solde dû de {formatMoney(result.member.balanceDue)}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[13px] font-medium mt-1">
+                      Motif :{" "}
+                      {result.reason === "SESSIONS_EXHAUSTED"
+                        ? "Séances épuisées (0 séance restante)"
+                        : result.reason === "OUTSIDE_TIME_WINDOW"
+                        ? "Hors créneau horaire autorisé"
+                        : result.reason === "CARD_NOT_FOUND"
+                        ? "Badge non reconnu"
+                        : result.reason === "CARD_BLOCKED"
+                        ? "Badge bloqué"
+                        : result.reason === "CARD_UNASSIGNED"
+                        ? "Badge non assigné"
+                        : result.reason === "NO_ACTIVE_SUBSCRIPTION"
+                        ? "Aucun abonnement actif"
+                        : result.reason === "SUBSCRIPTION_EXPIRED"
+                        ? "Abonnement expiré"
+                        : result.reason === "SUBSCRIPTION_SUSPENDED"
+                        ? "Abonnement suspendu"
+                        : result.reason}
+                    </div>
+                  )}
+
+                  <div className="text-[11px] font-mono-code text-[#64748B] mt-1">
+                    UID: {result.cardUid}
+                  </div>
                 </div>
-              </div>
             </div>
           </div>
         )}

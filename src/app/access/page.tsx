@@ -17,6 +17,8 @@ import {
   HelpCircle,
   Play,
   ArrowLeft,
+  Ticket,
+  CreditCard,
 } from "lucide-react";
 
 export default function KioskPage() {
@@ -290,7 +292,7 @@ export default function KioskPage() {
               </div>
 
               <p className="text-[13px] text-[#64748B]">
-                Testez immédiatement le comportement du contrôle d'accès selon les 7 scénarios métier prévus par la spécification :
+                Testez immédiatement le comportement du contrôle d'accès selon les scénarios métier prévus (formules temporelles, par séances, créneaux et crédits) :
               </p>
 
               {/* Quick Scenarios */}
@@ -322,12 +324,64 @@ export default function KioskPage() {
                 </button>
 
                 <button
+                  onClick={() => executeScan("04:6F:E7:5D")}
+                  className="w-full p-3 text-left rounded-[8px] border border-[#FED7AA] bg-[#FFF7ED] hover:bg-[#FFEDD5] transition-colors flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#C2410C]">
+                      3. Reste à Payer / Crédit (Walid)
+                    </div>
+                    <div className="text-[11px] text-[#EA580C]">UID: 04:6F:E7:5D · Accordé + Alerte Dette (2 000 DA)</div>
+                  </div>
+                  <CreditCard className="w-4 h-4 text-[#EA580C]" />
+                </button>
+
+                <button
+                  onClick={() => executeScan("04:70:F8:6E")}
+                  className="w-full p-3 text-left rounded-[8px] border border-[#BFDBFE] bg-[#EFF6FF] hover:bg-[#DBEAFE] transition-colors flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#1D4ED8]">
+                      4. Formule Séances (Selma)
+                    </div>
+                    <div className="text-[11px] text-[#2563EB]">UID: 04:70:F8:6E · Accordé + Décompte automatique</div>
+                  </div>
+                  <Ticket className="w-4 h-4 text-[#2563EB]" />
+                </button>
+
+                <button
+                  onClick={() => executeScan("04:92:1A:80")}
+                  className="w-full p-3 text-left rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] hover:bg-[#FEE2E2] transition-colors flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#B91C1C]">
+                      5. Séances Épuisées (Nadia)
+                    </div>
+                    <div className="text-[11px] text-[#DC2626]">UID: 04:92:1A:80 · 0 restante · Accès refusé</div>
+                  </div>
+                  <Ban className="w-4 h-4 text-[#DC2626]" />
+                </button>
+
+                <button
+                  onClick={() => executeScan("04:81:09:7F")}
+                  className="w-full p-3 text-left rounded-[8px] border border-[#E9D5FF] bg-[#FAF5FF] hover:bg-[#F3E8FF] transition-colors flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#7E22CE]">
+                      6. Créneau 13h-16h (Riad)
+                    </div>
+                    <div className="text-[11px] text-[#9333EA]">UID: 04:81:09:7F · Selon heure actuelle</div>
+                  </div>
+                  <Clock className="w-4 h-4 text-[#9333EA]" />
+                </button>
+
+                <button
                   onClick={() => executeScan("04:2B:A3:19")}
                   className="w-full p-3 text-left rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] hover:bg-[#FEE2E2] transition-colors flex items-center justify-between"
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-[#B91C1C]">
-                      3. Abonnement expiré (Bilel)
+                      7. Abonnement expiré (Bilel)
                     </div>
                     <div className="text-[11px] text-[#DC2626]">Expiré · Accès refusé</div>
                   </div>
@@ -340,7 +394,7 @@ export default function KioskPage() {
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-[#475569]">
-                      4. Abonnement suspendu (Mourad)
+                      8. Abonnement suspendu (Mourad)
                     </div>
                     <div className="text-[11px] text-[#64748B]">Litige en cours · Refusé</div>
                   </div>
@@ -353,7 +407,7 @@ export default function KioskPage() {
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-[#B91C1C]">
-                      5. Carte bloquée
+                      9. Carte bloquée
                     </div>
                     <div className="text-[11px] text-[#DC2626]">Vol / Impayé · Refusé</div>
                   </div>
@@ -366,7 +420,7 @@ export default function KioskPage() {
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-[#475569]">
-                      6. Carte en stock (non assignée)
+                      10. Carte en stock (non assignée)
                     </div>
                     <div className="text-[11px] text-[#64748B]">Non liée à un adhérent · Refusé</div>
                   </div>
@@ -379,7 +433,7 @@ export default function KioskPage() {
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-[#B91C1C]">
-                      7. Carte inconnue (hors parc)
+                      11. Carte inconnue (hors parc)
                     </div>
                     <div className="text-[11px] text-[#DC2626]">UID absent de la base · Refusé</div>
                   </div>

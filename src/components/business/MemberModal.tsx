@@ -5,6 +5,7 @@ import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Field } from "./Field";
 import { useToast } from "./Toast";
+import { invalidateCache } from "@/lib/cache";
 
 interface MemberModalProps {
   isOpen: boolean;
@@ -83,6 +84,7 @@ export const MemberModal: React.FC<MemberModalProps> = ({
         throw new Error(data.error?.message || "Erreur lors de l'enregistrement");
       }
 
+      invalidateCache(["/api/members", "/api/dashboard"]);
       toast.success(
         initialMember ? "Adhérent mis à jour" : "Adhérent créé",
         `${firstName} ${lastName} a été enregistré avec succès`

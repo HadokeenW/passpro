@@ -8,7 +8,7 @@ import { Modal } from "@/components/business/Modal";
 import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
 import { Tags, Plus, Edit2, Trash2, CheckCircle2, XCircle } from "lucide-react";
-import { getCachedData, setCachedData } from "@/lib/cache";
+import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
 
 export default function PlansPage() {
   const toast = useToast();
@@ -57,6 +57,17 @@ export default function PlansPage() {
 
   useEffect(() => {
     fetchPlans();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("plan"))) {
+        fetchPlans();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, []);
 
   const handleToggleActive = async (plan: any) => {
@@ -67,6 +78,7 @@ export default function PlansPage() {
         body: JSON.stringify({ active: !plan.active }),
       });
       if (res.ok) {
+        invalidateCache(["/api/plans", "/api/dashboard"]);
         toast.success(
           plan.active ? "Formule désactivée" : "Formule activée",
           `La formule ${plan.name} est maintenant ${plan.active ? "masquée à la vente" : "disponible à la vente"}`
@@ -90,6 +102,7 @@ export default function PlansPage() {
       if (!res.ok) {
         toast.error("Suppression refusée", data.error?.message || "Impossible de supprimer");
       } else {
+        invalidateCache(["/api/plans", "/api/dashboard"]);
         toast.success("Formule supprimée", `La formule a été retirée`);
         fetchPlans();
       }
@@ -162,15 +175,27 @@ export default function PlansPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <h3 className="text-[16px] font-bold text-[#0F172A]">{p.name}</h3>
-                    <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        p.active
-                          ? "bg-[#ECFDF5] text-[#047857]"
-                          : "bg-[#F1F5F9] text-[#64748B]"
-                      }`}
-                    >
-                      {p.active ? "Disponible" : "Désactivée"}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {p.planType === "SESSIONS" && (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                          🎟️ {p.sessionCount || 10} séances
+                        </span>
+                      )}
+                      {p.planType === "TIME_SLOT" && (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
+                          🕒 {p.startTime || "13:00"} - {p.endTime || "16:00"}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          p.active
+                            ? "bg-[#ECFDF5] text-[#047857]"
+                            : "bg-[#F1F5F9] text-[#64748B]"
+                        }`}
+                      >
+                        {p.active ? "Disponible" : "Désactivée"}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-[12px] text-[#64748B] line-clamp-2">
@@ -181,7 +206,11 @@ export default function PlansPage() {
                 <div className="pt-3 border-t border-[#F1F5F9] flex items-end justify-between">
                   <div>
                     <div className="text-[11px] font-medium text-[#64748B]">
-                      Durée : {p.durationDays} jour{p.durationDays > 1 ? "s" : ""}
+                      {p.planType === "SESSIONS"
+                        ? `Validité max : ${p.durationDays} j (${p.sessionCount || 10} séances)`
+                        : p.planType === "TIME_SLOT"
+                        ? `Validité : ${p.durationDays} j (${p.startTime || "13:00"} à ${p.endTime || "16:00"})`
+                        : `Durée : ${p.durationDays} jour${p.durationDays > 1 ? "s" : ""}`}
                     </div>
                     <div className="text-[20px] font-bold text-[#2563EB] nums mt-0.5">
                       {formatMoney(p.price)}

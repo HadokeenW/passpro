@@ -2,6 +2,7 @@ import React from "react";
 import { Check, X, AlertTriangle } from "lucide-react";
 import { ScanResult as ScanResultType } from "@/server/services/access-engine";
 import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 
 interface ScanResultViewProps {
   result: ScanResultType;
@@ -26,12 +27,14 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
     NO_ACTIVE_SUBSCRIPTION: "Aucun abonnement actif",
     SUBSCRIPTION_EXPIRED: "Abonnement expiré",
     SUBSCRIPTION_SUSPENDED: "Abonnement suspendu",
+    SESSIONS_EXHAUSTED: "Séances épuisées (0 restante)",
+    OUTSIDE_TIME_WINDOW: "Hors créneau horaire autorisé",
     OK: "Accès autorisé",
   };
 
   const background = !isGranted
     ? "linear-gradient(180deg, #DC2626 0%, #B91C1C 100%)"
-    : isExpiringSoon
+    : isExpiringSoon || (result.member?.hasDebt && result.member?.balanceDue)
     ? "linear-gradient(180deg, #F59E0B 0%, #D97706 50%, #B45309 100%)"
     : "linear-gradient(180deg, #059669 0%, #047857 100%)";
 
@@ -101,8 +104,30 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
           </h1>
 
           {/* Plan Name */}
-          <div className="text-[20px] md:text-[24px] text-white/90 font-medium mb-6">
+          <div className="text-[20px] md:text-[24px] text-white/90 font-medium mb-3">
             {result.member.planName}
+          </div>
+
+          {/* Special notices (Debt / Sessions / Time slot) */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+            {result.member.hasDebt && result.member.balanceDue && (
+              <div className="bg-red-600/90 text-white font-bold px-5 py-2 rounded-full border-2 border-white shadow-lg text-[16px] nums flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Reste à payer : {formatMoney(result.member.balanceDue)}</span>
+              </div>
+            )}
+
+            {result.member.planType === "SESSIONS" && (
+              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
+                🎟️ {result.member.remainingSessions ?? 0} séance(s) restante(s)
+              </div>
+            )}
+
+            {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
+              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
+                🕒 Créneau : {result.member.startTime} à {result.member.endTime}
+              </div>
+            )}
           </div>
 
           {/* Validity Pill */}

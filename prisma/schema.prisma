@@ -81,6 +81,12 @@ model Member {
   @@index([phone])
 }
 
+enum PlanType {
+  TEMPORAL
+  SESSIONS
+  TIME_SLOT
+}
+
 model Plan {
   id            String         @id @default(cuid())
   name          String
@@ -89,6 +95,10 @@ model Plan {
   description   String?
   active        Boolean        @default(true)
   sortOrder     Int            @default(0)
+  planType      PlanType       @default(TEMPORAL)
+  sessionCount  Int?
+  startTime     String?
+  endTime       String?
   subscriptions Subscription[]
   payments      Payment[]
 }
@@ -104,23 +114,32 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id          String             @id @default(cuid())
-  member      Member             @relation(fields: [memberId], references: [id])
-  memberId    String
-  plan        Plan               @relation(fields: [planId], references: [id])
-  planId      String
-  startDate   DateTime
-  endDate     DateTime
-  status      SubscriptionStatus @default(ACTIVE)
-  suspendedAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  payments    Payment[]
+  id                String             @id @default(cuid())
+  member            Member             @relation(fields: [memberId], references: [id])
+  memberId          String
+  plan              Plan               @relation(fields: [planId], references: [id])
+  planId            String
+  startDate         DateTime
+  endDate           DateTime
+  status            SubscriptionStatus @default(ACTIVE)
+  suspendedAt       DateTime?
+  planType          PlanType           @default(TEMPORAL)
+  totalSessions     Int?
+  remainingSessions Int?
+  startTime         String?
+  endTime           String?
+  price             Int                @default(0)
+  paidAmount        Int                @default(0)
+  balanceDue        Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  payments          Payment[]
 
   @@index([endDate])
   @@index([memberId, status])
   @@index([status, endDate])
   @@index([createdAt])
+  @@index([balanceDue])
 }
 
 // ─── Cartes RFID ───────────────────────────────────────────────────
@@ -152,20 +171,23 @@ enum PaymentMethod {
 }
 
 model Payment {
-  id             String        @id @default(cuid())
-  receiptNumber  String        @unique
-  member         Member        @relation(fields: [memberId], references: [id])
-  memberId       String
-  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
-  subscriptionId String?
-  plan           Plan?         @relation(fields: [planId], references: [id])
-  planId         String?
-  planName       String
-  amount         Int
-  method         PaymentMethod @default(CASH)
-  operator       User?         @relation(fields: [operatorId], references: [id])
-  operatorId     String?
-  createdAt      DateTime      @default(now())
+  id               String        @id @default(cuid())
+  receiptNumber    String        @unique
+  member           Member        @relation(fields: [memberId], references: [id])
+  memberId         String
+  subscription     Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId   String?
+  plan             Plan?         @relation(fields: [planId], references: [id])
+  planId           String?
+  planName         String
+  amount           Int
+  totalAmount      Int?
+  remainingBalance Int?
+  paymentType      String        @default("SUBSCRIPTION")
+  method           PaymentMethod @default(CASH)
+  operator         User?         @relation(fields: [operatorId], references: [id])
+  operatorId       String?
+  createdAt        DateTime      @default(now())
 
   @@index([createdAt])
 }
@@ -190,6 +212,8 @@ enum AccessReason {
   NO_ACTIVE_SUBSCRIPTION
   SUBSCRIPTION_EXPIRED
   SUBSCRIPTION_SUSPENDED
+  SESSIONS_EXHAUSTED
+  OUTSIDE_TIME_WINDOW
 }
 
 enum AccessSource {

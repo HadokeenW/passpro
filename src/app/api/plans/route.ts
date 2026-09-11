@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireRole(["ADMIN", "MANAGER"]);
     const body = await req.json();
-    const { name, price, durationDays, description, sortOrder } = body;
+    const { name, price, durationDays, description, sortOrder, planType, sessionCount, startTime, endTime } = body;
 
     if (!name || price === undefined || !durationDays) {
       throw new ApiError("VALIDATION_ERROR", "Le nom, le prix et la durée sont requis", 400);
@@ -43,6 +43,10 @@ export async function POST(req: NextRequest) {
         durationDays: parseInt(durationDays, 10),
         description: description ? description.trim() : null,
         sortOrder: sortOrder !== undefined ? parseInt(sortOrder, 10) : 0,
+        planType: planType || "TEMPORAL",
+        sessionCount: sessionCount ? parseInt(sessionCount, 10) : null,
+        startTime: startTime ? startTime.trim() : null,
+        endTime: endTime ? endTime.trim() : null,
         active: true,
       },
     });
@@ -52,7 +56,13 @@ export async function POST(req: NextRequest) {
       action: "plan.create",
       entityType: "Plan",
       entityId: plan.id,
-      after: { name: plan.name, price: plan.price, durationDays: plan.durationDays },
+      after: {
+        name: plan.name,
+        price: plan.price,
+        durationDays: plan.durationDays,
+        planType: plan.planType,
+        sessionCount: plan.sessionCount,
+      },
     });
 
     return NextResponse.json(plan, { status: 201 });

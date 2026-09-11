@@ -74,13 +74,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Smooth route transition indicator
   useEffect(() => {
-    if (prevPathRef.current !== pathname) {
-      prevPathRef.current = pathname;
-      setIsNavigating(true);
-      const timer = setTimeout(() => setIsNavigating(false), 200);
-      return () => clearTimeout(timer);
-    }
+    setIsNavigating(false);
   }, [pathname]);
+
+  const handleNavigate = (href: string) => {
+    setMobileMenuOpen(false);
+    if (pathname !== href) {
+      setIsNavigating(true);
+      setTimeout(() => setIsNavigating(false), 1000);
+    }
+  };
 
   // Global Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -337,7 +340,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="h-screen max-h-screen bg-[#EEF2F7] p-3 sm:p-4 lg:p-5 flex gap-4 lg:gap-5 overflow-hidden font-sans relative">
       {/* Instant route transition indicator */}
       {isNavigating && (
-        <div className="fixed top-0 left-0 right-0 h-[2.5px] bg-[#2563EB] z-[100] animate-pulse shadow-sm shadow-blue-500/50" />
+        <div className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#2563EB] via-[#60A5FA] to-[#3B82F6] z-[100] animate-nav-bar shadow-sm shadow-blue-500/40" />
       )}
 
       {/* Mobile Backdrop Overlay */}
@@ -404,13 +407,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       key={item.href}
                       href={item.href}
                       prefetch={true}
-                      onClick={() => setMobileMenuOpen(false)}
+                      onClick={() => handleNavigate(item.href)}
                       onMouseEnter={() => {
                         router.prefetch(item.href);
                         routePrewarmMap[item.href]?.forEach((url) => prewarmRoute(url));
                       }}
                       className={cn(
-                        "flex items-center justify-between px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium transition-all select-none",
+                        "flex items-center justify-between px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium transition-all duration-150 select-none active:scale-[0.98]",
                         isActive
                           ? "bg-[#F1F5F9] text-[#0F172A] font-bold shadow-xs"
                           : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
@@ -419,7 +422,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <div className="flex items-center gap-3">
                         <Icon
                           className={cn(
-                            "w-4 h-4 transition-colors",
+                            "w-4 h-4 transition-colors duration-150",
                             isActive ? "text-[#0F172A]" : "text-[#94A3B8]"
                           )}
                         />
@@ -929,7 +932,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* 3. Page Content Area inside the Right Floating Card */}
         <main className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-9 space-y-6">
-          {children}
+          <div key={pathname} className="page-enter space-y-6">
+            {children}
+          </div>
         </main>
       </div>
     </div>

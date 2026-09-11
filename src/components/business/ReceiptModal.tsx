@@ -13,6 +13,9 @@ interface ReceiptModalProps {
       id: string;
       receiptNumber: string;
       amount: number;
+      totalAmount?: number | null;
+      remainingBalance?: number | null;
+      paymentType?: string | null;
       method: string;
       planName: string;
       createdAt: string;
@@ -147,12 +150,30 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <div className="border-t-2 border-[#0F172A] my-1" />
 
           {/* Total & Payment Method */}
+          {payment.totalAmount && payment.totalAmount !== payment.amount && (
+            <div className="flex justify-between items-center text-[11px] text-[#64748B]">
+              <span>Prix formule :</span>
+              <span className="nums font-semibold text-[#0F172A]">
+                {formatMoney(payment.totalAmount, setting?.currency || "DA")}
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between items-center text-[14px] font-bold">
             <span>TOTAL RÉGLÉ</span>
             <span className="nums text-[15px]">
               {formatMoney(payment.amount, setting?.currency || "DA")}
             </span>
           </div>
+
+          {payment.remainingBalance !== undefined && payment.remainingBalance !== null && payment.remainingBalance > 0 && (
+            <div className="p-2 bg-[#FEF2F2] border border-dashed border-[#FECACA] rounded text-[12px] font-bold text-[#DC2626] flex justify-between items-center">
+              <span>RESTE À PAYER :</span>
+              <span className="nums text-[13px]">
+                {formatMoney(payment.remainingBalance, setting?.currency || "DA")}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between items-center text-[11px] text-[#64748B]">
             <span>Mode de règlement :</span>

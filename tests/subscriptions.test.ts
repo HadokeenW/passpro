@@ -51,6 +51,30 @@ describe("Subscription Status Derivation (pure function)", () => {
     };
     expect(deriveStatus(sub, now)).toBe("CANCELLED");
   });
+
+  it("returns EXPIRED for session plan with 0 remaining sessions", () => {
+    const sub = {
+      status: "ACTIVE" as const,
+      planType: "SESSIONS" as const,
+      remainingSessions: 0,
+      totalSessions: 10,
+      startDate: new Date("2026-08-15T00:00:00.000Z"),
+      endDate: new Date("2026-09-30T00:00:00.000Z"),
+    };
+    expect(deriveStatus(sub, now)).toBe("EXPIRED");
+  });
+
+  it("returns ACTIVE for session plan with > 0 remaining sessions and valid date range", () => {
+    const sub = {
+      status: "ACTIVE" as const,
+      planType: "SESSIONS" as const,
+      remainingSessions: 4,
+      totalSessions: 10,
+      startDate: new Date("2026-08-15T00:00:00.000Z"),
+      endDate: new Date("2026-09-30T00:00:00.000Z"),
+    };
+    expect(deriveStatus(sub, now)).toBe("ACTIVE");
+  });
 });
 
 describe("Renewal Date Calculation", () => {

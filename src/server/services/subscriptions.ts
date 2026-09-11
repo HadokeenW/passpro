@@ -1,4 +1,4 @@
-import { Subscription, SubscriptionStatus, Plan } from "@prisma/client";
+import { Subscription, SubscriptionStatus, Plan, PlanType } from "@prisma/client";
 import { daysBetween } from "@/lib/dates";
 import { ApiError } from "@/lib/errors";
 
@@ -7,6 +7,13 @@ export interface DerivedSubscriptionStatus {
   daysRemaining: number;
   isExpiringSoon: boolean;
   isExpired: boolean;
+  hasDebt?: boolean;
+  balanceDue?: number;
+  remainingSessions?: number | null;
+  totalSessions?: number | null;
+  planType?: PlanType;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 /**
@@ -14,12 +21,22 @@ export interface DerivedSubscriptionStatus {
  * Manual statuses (SUSPENDED, CANCELLED) take precedence.
  */
 export function deriveStatus(
-  subscription: Pick<Subscription, "status" | "startDate" | "endDate">,
+  subscription: Pick<Subscription, "status" | "startDate" | "endDate"> &
+    Partial<Pick<Subscription, "remainingSessions">>,
   now: Date = new Date()
 ): SubscriptionStatus {
   // Manual decisions override temporal calculations
   if (subscription.status === "SUSPENDED") return "SUSPENDED";
   if (subscription.status === "CANCELLED") return "CANCELLED";
+
+  // If session-based and 0 sessions remaining -> EXPIRED
+  if (
+    subscription.remainingSessions !== undefined &&
+    subscription.remainingSessions !== null &&
+    subscription.remainingSessions <= 0
+  ) {
+    return "EXPIRED";
+  }
 
   const currentTime = now.getTime();
   const startTime = new Date(subscription.startDate).getTime();
@@ -45,20 +62,29 @@ export function deriveStatus(
 }
 
 /**
- * Calculates full derived information including days remaining
+ * Calculates full derived information including days remaining, debt and session state
  */
 export function getSubscriptionDetails(
-  subscription: Pick<Subscription, "status" | "startDate" | "endDate">,
+  subscription: Pick<Subscription, "status" | "startDate" | "endDate"> &
+    Partial<Pick<Subscription, "remainingSessions" | "totalSessions" | "planType" | "balanceDue" | "startTime" | "endTime">>,
   now: Date = new Date()
 ): DerivedSubscriptionStatus {
   const derived = deriveStatus(subscription, now);
   const daysRemaining = daysBetween(now, new Date(subscription.endDate));
+  const balanceDue = subscription.balanceDue || 0;
 
   return {
     status: derived,
     daysRemaining,
     isExpiringSoon: derived === "EXPIRING_SOON",
     isExpired: derived === "EXPIRED",
+    hasDebt: balanceDue > 0,
+    balanceDue,
+    remainingSessions: subscription.remainingSessions ?? null,
+    totalSessions: subscription.totalSessions ?? null,
+    planType: subscription.planType,
+    startTime: subscription.startTime ?? null,
+    endTime: subscription.endTime ?? null,
   };
 }
 

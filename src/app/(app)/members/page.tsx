@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/business/EmptyState";
 import { MemberModal } from "@/components/business/MemberModal";
 import { Users, UserPlus, ChevronLeft, ChevronRight, CreditCard, Download } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import { downloadCsv } from "@/lib/csv";
 
 import { getCachedData, setCachedData } from "@/lib/cache";
@@ -62,12 +63,24 @@ export default function MembersPage() {
 
   useEffect(() => {
     fetchMembers();
+
+    const onInvalidate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prefixes?: string[] }>;
+      const prefixes = customEvent.detail?.prefixes;
+      if (!prefixes || prefixes.length === 0 || prefixes.some((p) => p.includes("member"))) {
+        fetchMembers();
+      }
+    };
+
+    window.addEventListener("passpro:cache-invalidate", onInvalidate);
+    return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, filter, search]);
 
   const filterOptions = [
     { label: "Tous", value: "all" },
     { label: "Actifs", value: "active" },
     { label: "Inactifs", value: "inactive" },
+    { label: "Avec dette / crédit", value: "debt" },
     { label: "Cartes bloquées", value: "blocked" },
   ];
 
@@ -207,8 +220,33 @@ export default function MembersPage() {
                     <td className="px-4 text-[#64748B]">
                       {m.phone || m.email || "—"}
                     </td>
-                    <td className="px-4 text-[#0F172A] font-medium">
-                      {m.subscription ? m.subscription.planName : "—"}
+                    <td className="px-4">
+                      {m.subscription ? (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 font-medium text-[#0F172A]">
+                            <span>{m.subscription.planName}</span>
+                            {m.subscription.planType === "SESSIONS" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                                {m.subscription.remainingSessions ?? 0} séanc.
+                              </span>
+                            )}
+                            {m.subscription.planType === "TIME_SLOT" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
+                                {m.subscription.startTime || "13h"}-{m.subscription.endTime || "16h"}
+                              </span>
+                            )}
+                          </div>
+                          {m.subscription.balanceDue > 0 && (
+                            <div>
+                              <span className="text-[11px] font-bold px-1.5 py-0.2 rounded bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
+                                Reste : {formatMoney(m.subscription.balanceDue)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[#94A3B8]">—</span>
+                      )}
                     </td>
                     <td className="px-4">
                       {m.card ? (
