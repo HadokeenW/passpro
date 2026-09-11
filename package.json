@@ -1,16 +1,50 @@
 {
   "name": "passpro",
   "version": "1.0.0",
-  "private": true,
+  "main": "electron/main.cjs",
+  "author": "PASSPro",
+  "description": "Système de contrôle d'accès et de gestion pour salles de sport",
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
+    "electron:dev": "concurrently -k \"cross-env PORT=3000 npm run dev\" \"wait-on tcp:127.0.0.1:3000 && electron .\"",
+    "electron:start": "concurrently -k \"cross-env PORT=3000 npm run start\" \"wait-on tcp:127.0.0.1:3000 && electron .\"",
+    "electron:build": "npm run build && electron-builder --win --x64",
+    "electron:pack": "npm run build && electron-builder --dir",
     "test": "vitest run",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "build": {
+    "appId": "dz.passpro.app",
+    "productName": "PASSPro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "prisma/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "electron/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PASSPro Fitness"
+    }
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -32,11 +66,16 @@
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.3",
     "prisma": "^6.4.1",
     "tailwindcss": "^4.0.9",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "vitest": "^3.0.7"
+    "vitest": "^3.0.7",
+    "wait-on": "^9.1.0"
   }
 }

@@ -54,6 +54,39 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const { payment, setting, isDuplicate } = receiptData;
 
   const handlePrint = () => {
+    if (typeof window !== "undefined" && (window as any).electronAPI?.printReceipt) {
+      const receiptEl = document.getElementById("thermal-receipt");
+      if (receiptEl) {
+        const receiptHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Ticket de caisse</title>
+    <style>
+      @page { margin: 0; size: 80mm auto; }
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 12px;
+        color: #000;
+        width: 74mm;
+        background: #fff;
+      }
+      * { box-sizing: border-box; }
+      .border-dashed { border-style: dashed; }
+      .text-center { text-align: center; }
+      .font-bold { font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    ${receiptEl.innerHTML}
+  </body>
+</html>`;
+        (window as any).electronAPI.printReceipt(receiptHtml);
+        return;
+      }
+    }
     window.print();
   };
 

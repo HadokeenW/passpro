@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/business/Toast";
+import { TitleBar } from "@/components/desktop/TitleBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,8 +28,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="antialiased font-sans min-h-screen bg-[#F6F8FB] text-[#0F172A]">
-        <ToastProvider>{children}</ToastProvider>
+      <body className="antialiased font-sans min-h-screen bg-[#F6F8FB] text-[#0F172A] flex flex-col">
+        <TitleBar />
+        <div className="flex-1 flex flex-col min-h-0">
+          <ToastProvider>{children}</ToastProvider>
+        </div>
       </body>
     </html>
   );

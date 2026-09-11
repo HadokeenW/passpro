@@ -211,3 +211,28 @@
     border: none !important;
   }
 }
+
+/* Masquage complet de l'indicateur / logo Next.js en bas à gauche */
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay],
+nextjs-portal,
+div[data-nextjs-dev-tools],
+#next-logo,
+#__next-build-watcher,
+.nextjs-toast-errors-parent,
+aside[aria-label="Next.js"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Electron Frameless Window Drag Utilities */
+.app-drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
