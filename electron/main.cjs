@@ -539,10 +539,26 @@ function requestScanEvaluation(uid) {
 async function triggerRfidPopup(scannedUid) {
   console.log(`[PASSPro] Global RFID Card Detected: ${scannedUid}`);
 
-  // If the receptionist is currently in management mode (e.g. search bar or modal is focused),
-  // DO NOT popup the Kiosk window, and DO NOT record a turnstile access passage!
-  if (isManagementMode) {
-    console.log(`[PASSPro] RFID scan intercepted for Management/Search (UID: ${scannedUid}) - Kiosk popup suppressed.`);
+  // If receptionist is in management mode OR dashboard has an active modal / focused input,
+  // DO NOT popup Kiosk window and DO NOT record a turnstile access passage!
+  let dashboardBusy = isManagementMode;
+  if (!dashboardBusy && mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
+    try {
+      dashboardBusy = await mainWindow.webContents.executeJavaScript(`
+        Boolean(
+          document.querySelector('[role="dialog"]') ||
+          document.querySelector('[aria-modal="true"]') ||
+          document.activeElement?.tagName === "INPUT" ||
+          document.activeElement?.tagName === "TEXTAREA"
+        )
+      `);
+    } catch (e) {
+      dashboardBusy = false;
+    }
+  }
+
+  if (dashboardBusy) {
+    console.log(`[PASSPro] RFID scan intercepted for Management/Modal (UID: ${scannedUid}) - Kiosk popup suppressed.`);
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
       mainWindow.webContents.send("management-rfid-scan", { uid: scannedUid });
     }

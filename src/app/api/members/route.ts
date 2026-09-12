@@ -5,6 +5,8 @@ import { errorResponse, ApiError } from "@/lib/errors";
 import { withAudit } from "@/server/services/audit";
 import { deriveStatus } from "@/server/services/subscriptions";
 
+import { normalizeUid } from "@/server/services/access-engine";
+
 export async function GET(req: NextRequest) {
   try {
     await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);
@@ -19,13 +21,35 @@ export async function GET(req: NextRequest) {
     };
 
     if (q) {
-      where.OR = [
+      const normQ = q.length >= 4 ? normalizeUid(q) : "";
+      const words = q.split(/\s+/).filter(Boolean);
+      const orList: any[] = [
         { firstName: { contains: q } },
         { lastName: { contains: q } },
         { phone: { contains: q } },
         { email: { contains: q } },
         { cards: { some: { uid: { contains: q.toUpperCase() } } } },
       ];
+      if (normQ && normQ !== q.toUpperCase()) {
+        orList.push({ cards: { some: { uid: { contains: normQ } } } });
+      }
+      if (words.length > 1) {
+        orList.push(
+          {
+            AND: [
+              { firstName: { contains: words[0] } },
+              { lastName: { contains: words.slice(1).join(" ") } },
+            ],
+          },
+          {
+            AND: [
+              { lastName: { contains: words[0] } },
+              { firstName: { contains: words.slice(1).join(" ") } },
+            ],
+          }
+        );
+      }
+      where.OR = orList;
     }
 
     const now = new Date();

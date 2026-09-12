@@ -36,6 +36,25 @@ export const Modal: React.FC<ModalProps> = ({
     setMounted(true);
   }, []);
 
+  // Set management mode in Electron while modal is open to suppress kiosk popup
+  useEffect(() => {
+    if (isOpen) {
+      if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+        (window as any).electronAPI.setManagementMode(true);
+      }
+    }
+    return () => {
+      if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+        setTimeout(() => {
+          const hasOtherDialog = Boolean(document.querySelector('[role="dialog"]'));
+          if (!hasOtherDialog) {
+            (window as any).electronAPI.setManagementMode(false);
+          }
+        }, 150);
+      }
+    };
+  }, [isOpen]);
+
   // Smooth entrance and exit animation cycle
   useEffect(() => {
     if (isOpen) {

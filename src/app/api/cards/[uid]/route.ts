@@ -14,9 +14,10 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);
     const { uid: rawParamUid } = await params;
-    const uid = normalizeUid(decodeURIComponent(rawParamUid));
+    const decoded = decodeURIComponent(rawParamUid).trim();
+    const uid = normalizeUid(decoded);
 
-    const card = await prisma.card.findUnique({
+    let card = await prisma.card.findUnique({
       where: { uid },
       include: {
         member: {
@@ -31,6 +32,30 @@ export async function GET(req: NextRequest, { params }: Params) {
         },
       },
     });
+
+    if (!card && decoded) {
+      card = await prisma.card.findFirst({
+        where: {
+          OR: [
+            { uid: decoded },
+            { uid: decoded.toUpperCase() },
+            { uid: decoded.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() },
+          ],
+        },
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              photoUrl: true,
+              deletedAt: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!card) {
       return NextResponse.json({ error: { message: "Carte introuvable" } }, { status: 404 });

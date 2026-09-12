@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/money";
 import { formatRelativeTime } from "@/lib/dates";
 import {
   Users,
+  UserPlus,
   AlertCircle,
   CalendarX,
   ScanLine,
@@ -96,9 +97,21 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          <Link href="/payments">
-            <Button variant="primary">{t("dashboard.newSubscription")}</Button>
-          </Link>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("passpro:open-onboarding"));
+              }
+            }}
+            className="flex items-center gap-2"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>{t("members.newMember") || "Nouvel adhérent"}</span>
+            <span className="text-[10.5px] bg-white/20 px-1.5 py-0.5 rounded font-mono text-white/90 ml-0.5">
+              F2
+            </span>
+          </Button>
         </div>
       </div>
 

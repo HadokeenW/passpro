@@ -26,19 +26,23 @@ import {
   UploadCloud,
   HardDrive,
 } from "lucide-react";
+import { getCachedData, setCachedData } from "@/lib/cache";
 
 export default function SettingsPage() {
   const router = useRouter();
   const toast = useToast();
   const { t, language } = useTranslation();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  const cachedAuth = getCachedData<any>("/api/auth/me");
+  const cachedSettings = getCachedData<any>("/api/settings");
+
+  const [currentUser, setCurrentUser] = useState<any>(() => cachedAuth?.user || null);
   const [activeTab, setActiveTab] = useState<
     "gym" | "general" | "hardware" | "accounts" | "backup" | "audit"
   >("gym");
 
   // Settings state
-  const [settings, setSettings] = useState<any>({
+  const [settings, setSettings] = useState<any>(() => cachedSettings || {
     gymName: "PASSPro Fitness Club",
     gymPhone: "0550 12 34 56",
     gymEmail: "contact@passpro.dz",
@@ -204,7 +208,10 @@ export default function SettingsPage() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        if (data) setSettings(data);
+        if (data && !data.error) {
+          setSettings(data);
+          setCachedData("/api/settings", data);
+        }
       })
       .catch(console.error);
   };
@@ -244,9 +251,9 @@ export default function SettingsPage() {
           return;
         }
         setCurrentUser(d.user);
+        setCachedData("/api/auth/me", d);
       })
-      .catch(() => router.replace("/login"))
-      .finally(() => setIsLoadingUser(false));
+      .catch(() => router.replace("/login"));
   }, [router, toast]);
 
   useEffect(() => {
@@ -334,12 +341,8 @@ export default function SettingsPage() {
     }
   }, [currentUser, activeTab]);
 
-  if (isLoadingUser || currentUser?.role === "RECEPTIONIST") {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+  if (currentUser?.role === "RECEPTIONIST") {
+    return null;
   }
 
   return (

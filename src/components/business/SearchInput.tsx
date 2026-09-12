@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 
@@ -8,12 +8,37 @@ interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ className, onSearch, shortcutBadge, onChange, ...props }, ref) => {
+  ({ className, onSearch, shortcutBadge, onChange, onFocus, onBlur, ...props }, ref) => {
+    const internalRef = useRef<HTMLInputElement>(null);
+    const resolvedRef = (ref || internalRef) as React.RefObject<HTMLInputElement>;
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+        (window as any).electronAPI.setManagementMode(true);
+      }
+      onFocus?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setTimeout(() => {
+        if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+          const hasDialog = Boolean(document.querySelector('[role="dialog"]'));
+          const isInputActive = Boolean(document.activeElement?.tagName === "INPUT");
+          if (!hasDialog && !isInputActive) {
+            (window as any).electronAPI.setManagementMode(false);
+          }
+        }
+      }, 200);
+      onBlur?.(e);
+    };
+
     return (
       <div className={cn("relative w-[280px]", className)}>
         <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
-          ref={ref}
+          ref={resolvedRef}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           onChange={(e) => {
             onChange?.(e);
             onSearch?.(e.target.value);

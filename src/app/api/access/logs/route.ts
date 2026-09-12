@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { errorResponse } from "@/lib/errors";
 import { AccessDecision } from "@prisma/client";
+import { normalizeUid } from "@/server/services/access-engine";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,19 +23,48 @@ export async function GET(req: NextRequest) {
     }
 
     if (q) {
-      where.OR = [
+      const normQ = q.length >= 4 ? normalizeUid(q) : "";
+      const words = q.split(/\s+/).filter(Boolean);
+      const memberOrList: any[] = [
+        { firstName: { contains: q } },
+        { lastName: { contains: q } },
+        { phone: { contains: q } },
+      ];
+      if (words.length > 1) {
+        memberOrList.push(
+          {
+            AND: [
+              { firstName: { contains: words[0] } },
+              { lastName: { contains: words.slice(1).join(" ") } },
+            ],
+          },
+          {
+            AND: [
+              { lastName: { contains: words[0] } },
+              { firstName: { contains: words.slice(1).join(" ") } },
+            ],
+          }
+        );
+      }
+
+      const orList: any[] = [
         { cardUid: { contains: q.toUpperCase() } },
         { kioskName: { contains: q } },
         {
           member: {
-            OR: [
-              { firstName: { contains: q } },
-              { lastName: { contains: q } },
-              { phone: { contains: q } },
-            ],
+            OR: memberOrList,
           },
         },
       ];
+      const strippedQ = q.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      if (normQ && normQ !== q.toUpperCase()) {
+        orList.push({ cardUid: { contains: normQ } });
+      }
+      if (strippedQ && strippedQ !== q.toUpperCase() && strippedQ !== normQ) {
+        orList.push({ cardUid: { contains: strippedQ } });
+      }
+
+      where.OR = orList;
     }
 
     if (from || to) {

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/business/Card";
 import { SearchInput } from "@/components/business/SearchInput";
 import { FilterPills } from "@/components/business/FilterPills";
@@ -11,8 +12,10 @@ import { formatDateTime } from "@/lib/dates";
 import { History, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCachedData, setCachedData } from "@/lib/cache";
 import { useTranslation } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export default function AccessLogsPage() {
+  const router = useRouter();
   const { t } = useTranslation();
   const initialCacheKey = "/api/access/logs?page=1&pageSize=25&decision=all&q=";
   const initialData = getCachedData<any>(initialCacheKey);
@@ -70,6 +73,29 @@ export default function AccessLogsPage() {
     return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, decision, search]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).electronAPI?.onManagementRfidScan) return;
+
+    const cleanup = (window as any).electronAPI.onManagementRfidScan((data: { uid: string }) => {
+      const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+      // If top search bar is focused, leave it to top search bar!
+      if (activeEl && (activeEl.id === "global-search-bar" || activeEl.getAttribute("data-global-search") === "true")) {
+        return;
+      }
+      // If a dialog is open, let dialog handle it
+      if (typeof document !== "undefined" && document.querySelector('[role="dialog"]')) {
+        return;
+      }
+
+      if (data?.uid) {
+        setSearch(data.uid.trim());
+        setPage(1);
+      }
+    });
+
+    return () => cleanup?.();
+  }, []);
+
   const { language } = useTranslation();
 
   const translateReason = (reason: string) => {
@@ -123,6 +149,11 @@ export default function AccessLogsPage() {
             setSearch(e.target.value);
             setPage(1);
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.keyCode === 13) {
+              e.preventDefault();
+            }
+          }}
           className="w-full sm:w-[320px]"
         />
         <FilterPills
@@ -164,7 +195,18 @@ export default function AccessLogsPage() {
               <tbody className="divide-y divide-[#F1F5F9]">
                 {logs.map((log) => {
                   return (
-                    <tr key={log.id} className="h-12 hover:bg-[#F8FAFC] transition-colors">
+                    <tr
+                      key={log.id}
+                      onClick={() => {
+                        if (log.member?.id) {
+                          router.push(`/members/${log.member.id}`);
+                        }
+                      }}
+                      className={cn(
+                        "h-12 hover:bg-[#F8FAFC] transition-colors",
+                        log.member?.id && "cursor-pointer"
+                      )}
+                    >
                       <td className="px-5 font-medium text-[#0F172A] nums">
                         {formatDateTime(log.createdAt)}
                       </td>

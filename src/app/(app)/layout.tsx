@@ -41,6 +41,7 @@ const routePrewarmMap: Record<string, string[]> = {
   "/payments": ["/api/payments?page=1&pageSize=15&period=today"],
   "/access-logs": ["/api/access/logs?page=1&pageSize=25&decision=all&q="],
   "/plans": ["/api/plans?includeInactive=true"],
+  "/settings": ["/api/settings"],
 };
 
 interface UserInfo {
@@ -127,6 +128,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setIsNavigating(false);
     setIsSearchOpen(false);
   }, [pathname]);
+
+  // Automatically activate management mode in Electron whenever ANY input or dialog is active
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable ||
+        Boolean(document.querySelector('[role="dialog"]'))
+      ) {
+        if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+          (window as any).electronAPI.setManagementMode(true);
+        }
+      }
+    };
+
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const active = document.activeElement as HTMLElement;
+        const hasDialog = Boolean(document.querySelector('[role="dialog"]'));
+        const isInputActive =
+          active?.tagName === "INPUT" ||
+          active?.tagName === "TEXTAREA" ||
+          active?.isContentEditable;
+
+        if (!hasDialog && !isInputActive) {
+          if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+            (window as any).electronAPI.setManagementMode(false);
+          }
+        }
+      }, 150);
+    };
+
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
 
   const handleNavigate = (href: string) => {
     setMobileMenuOpen(false);
@@ -218,11 +260,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || !(window as any).electronAPI?.onManagementRfidScan) return;
 
     const cleanup = (window as any).electronAPI.onManagementRfidScan(async (data: { uid: string }) => {
-      // CRITICAL: If the F2 onboarding modal or any dialog modal is open, DO NOT touch search or navigate!
+      const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+      const isTopSearchFocused =
+        activeEl === searchInputRef.current ||
+        Boolean(activeEl && (activeEl.id === "global-search-bar" || activeEl.getAttribute("data-global-search") === "true"));
+
+      // 1. If any modal / dialog is open, let modal handle it
       if (
         isOnboardWizardOpenRef.current ||
         (typeof document !== "undefined" && document.querySelector('[role="dialog"]'))
       ) {
+        return;
+      }
+
+      // 2. If another input is focused (not top search), let that local input handle it
+      if (!isTopSearchFocused && activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      // 3. If on /access-logs or /members and top search is NOT focused, let page handle it
+      if (!isTopSearchFocused && (pathname === "/access-logs" || pathname === "/members")) {
         return;
       }
 
@@ -241,13 +298,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             return;
           }
         }
+
+        const sRes = await fetch(`/api/search?q=${encodeURIComponent(cleanUid)}`);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          const targetMember = sData?.cards?.[0]?.member || sData?.members?.[0];
+          if (targetMember?.id) {
+            setSearchQuery(`${targetMember.firstName} ${targetMember.lastName}`);
+            setIsSearchOpen(false);
+            searchInputRef.current?.blur();
+            router.push(`/members/${targetMember.id}`);
+            return;
+          }
+        }
       } catch (err) {
         console.error("Management RFID scan error:", err);
       }
     });
 
     return () => cleanup?.();
-  }, [router]);
+  }, [router, pathname]);
 
   // Fetch user info and unread notifications count
   const fetchUnreadCount = () => {
@@ -511,22 +581,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        {/* Quick Action: Nouvel Adhérent (F2) */}
-        <div className="mb-3 px-1">
-          <button
-            onClick={openOnboardWizard}
-            className="w-full flex items-center justify-between gap-2 py-2 px-3 rounded-[12px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-[12.5px] shadow-sm shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer group"
-          >
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-white" />
-              <span>{t("members.newMember") || "Nouvel adhérent"}</span>
-            </div>
-            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono text-white/90">
-              F2
-            </span>
-          </button>
-        </div>
-
         {/* Middle: Navigation Items */}
         <div className="flex-1 overflow-y-auto space-y-4 py-1 pr-1">
           {navGroups.map((group) => (
@@ -643,6 +697,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Search className="w-4 h-4 mr-2.5 rtl:mr-0 rtl:ml-2.5 shrink-0 text-[#94A3B8]" />
                 <input
                   ref={searchInputRef}
+                  id="global-search-bar"
+                  data-global-search="true"
                   type="text"
                   placeholder={t("nav.searchPlaceholder")}
                   value={searchQuery}
@@ -715,8 +771,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   className="w-full bg-transparent text-[13.5px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none pr-1 rtl:pr-0 rtl:pl-1 cursor-text"
                 />
 
-                {/* Keyboard Shortcut Indicator / Clear Button */}
-                {searchQuery ? (
+                {/* Clear Button */}
+                {searchQuery && (
                   <button
                     onClick={() => {
                       setSearchQuery("");
@@ -727,12 +783,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                ) : (
-                  <div className="flex items-center gap-1 shrink-0 select-none pointer-events-none">
-                    <kbd className="hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10.5px] font-mono font-medium text-[#94A3B8] bg-[#F1F5F9] border border-[#E2E8F0] rounded-[5px] shadow-2xs">
-                      /
-                    </kbd>
-                  </div>
                 )}
               </div>
 

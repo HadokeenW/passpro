@@ -30,18 +30,43 @@ export async function GET(req: NextRequest) {
     }
 
     if (q) {
-      where.OR = [
+      const normQ = q.length >= 4 ? normalizeUid(q) : "";
+      const words = q.split(/\s+/).filter(Boolean);
+      const memberOrList: any[] = [
+        { firstName: { contains: q } },
+        { lastName: { contains: q } },
+        { phone: { contains: q } },
+      ];
+      if (words.length > 1) {
+        memberOrList.push(
+          {
+            AND: [
+              { firstName: { contains: words[0] } },
+              { lastName: { contains: words.slice(1).join(" ") } },
+            ],
+          },
+          {
+            AND: [
+              { lastName: { contains: words[0] } },
+              { firstName: { contains: words.slice(1).join(" ") } },
+            ],
+          }
+        );
+      }
+
+      const orList: any[] = [
         { uid: { contains: q.toUpperCase() } },
         {
           member: {
-            OR: [
-              { firstName: { contains: q } },
-              { lastName: { contains: q } },
-              { phone: { contains: q } },
-            ],
+            OR: memberOrList,
           },
         },
       ];
+      if (normQ && normQ !== q.toUpperCase()) {
+        orList.push({ uid: { contains: normQ } });
+      }
+
+      where.OR = orList;
     }
 
     const [total, cards] = await Promise.all([

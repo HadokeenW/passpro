@@ -95,14 +95,33 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
       setError("");
       const timer = setTimeout(() => {
         inputRef.current?.focus();
+        inputRef.current?.select();
       }, 80);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanUid = uid.trim().toUpperCase();
+  // Listen for RFID scans while CardAssignModal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof window === "undefined" || !(window as any).electronAPI?.onManagementRfidScan) return;
+
+    const cleanup = (window as any).electronAPI.onManagementRfidScan((data: { uid: string }) => {
+      if (data?.uid) {
+        const clean = data.uid.trim().toUpperCase();
+        setUid(clean);
+        handleSubmit(clean);
+      }
+    });
+    return () => cleanup?.();
+  }, [isOpen, memberId]);
+
+  const handleSubmit = async (overrideUid?: string | React.FormEvent) => {
+    if (overrideUid && typeof overrideUid !== "string" && "preventDefault" in overrideUid) {
+      overrideUid.preventDefault();
+    }
+    const targetVal = typeof overrideUid === "string" ? overrideUid : (uid || inputRef.current?.value || "");
+    const cleanUid = targetVal.trim().toUpperCase();
     if (!cleanUid) {
       setError(tLabels.errEmpty[language]);
       inputRef.current?.focus();

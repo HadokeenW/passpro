@@ -111,6 +111,31 @@ export default function MembersPage() {
     return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, filter, search]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).electronAPI?.onManagementRfidScan) return;
+
+    const cleanup = (window as any).electronAPI.onManagementRfidScan((data: { uid: string }) => {
+      const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+      // If top search bar is focused, leave it to top search bar!
+      if (activeEl && (activeEl.id === "global-search-bar" || activeEl.getAttribute("data-global-search") === "true")) {
+        return;
+      }
+      if (
+        isPaymentModalOpen ||
+        selectedMember ||
+        (typeof document !== "undefined" && document.querySelector('[role="dialog"]'))
+      ) {
+        return;
+      }
+      if (data?.uid) {
+        setSearch(data.uid.trim());
+        setPage(1);
+      }
+    });
+
+    return () => cleanup?.();
+  }, [isPaymentModalOpen, selectedMember]);
+
   const filterOptions = [
     { label: t("members.filters.all"), value: "all" },
     { label: t("members.filters.active"), value: "active" },
@@ -255,6 +280,11 @@ export default function MembersPage() {
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(1);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.keyCode === 13) {
+              e.preventDefault();
+            }
           }}
           className="w-full sm:w-[320px]"
         />
