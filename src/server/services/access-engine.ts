@@ -52,6 +52,7 @@ export function normalizeUid(rawUid: string): string {
 
 // In-memory anti-bounce cache: uid -> { timestamp, result }
 const recentScans = new Map<string, { timestamp: number; result: ScanResult }>();
+let cachedKioskName: { name: string; expiresAt: number } | null = null;
 
 /**
  * Creates deduplicated alerts within a 60-minute window
@@ -114,11 +115,17 @@ export async function evaluateScan(
     return cached.result;
   }
 
-  // Get kiosk name from settings if not provided
+  // Get kiosk name from settings if not provided (cached in memory)
   let kioskName = kioskNameOverride;
   if (!kioskName) {
-    const setting = await prisma.setting.findFirst();
-    kioskName = setting?.kioskName || "BORNE-01";
+    const nowMs = Date.now();
+    if (cachedKioskName && cachedKioskName.expiresAt > nowMs) {
+      kioskName = cachedKioskName.name;
+    } else {
+      const setting = await prisma.setting.findFirst({ select: { kioskName: true } });
+      kioskName = setting?.kioskName || "BORNE-01";
+      cachedKioskName = { name: kioskName, expiresAt: nowMs + 60000 };
+    }
   }
 
   // 2. Fetch card with member & latest subscription
@@ -275,38 +282,36 @@ export async function evaluateScan(
     }
   }
 
-  // 3. Update card's lastSeenAt if card exists
-  if (card) {
-    await prisma.card.update({
-      where: { uid },
-      data: { lastSeenAt: now },
-    });
-  }
-
-  // 4. Record AccessLog
-  await prisma.accessLog.create({
-    data: {
-      cardUid: uid,
-      memberId: card?.memberId || null,
-      decision,
-      reason,
-      kioskName,
-      source,
-      createdAt: now,
-    },
-  });
-
-  // 5. Trigger deduplicated alert if applicable
-  if (alertLevel && alertType) {
-    await createDeduplicatedAlert({
-      type: alertType,
-      level: alertLevel,
-      title: alertTitle,
-      message: alertMsg,
-      cardUid: uid,
-      memberId: card?.memberId || undefined,
-    });
-  }
+  // 3, 4, 5. Persist card update, access log and alert in parallel
+  await Promise.all([
+    card
+      ? prisma.card.update({
+          where: { uid },
+          data: { lastSeenAt: now },
+        })
+      : Promise.resolve(),
+    prisma.accessLog.create({
+      data: {
+        cardUid: uid,
+        memberId: card?.memberId || null,
+        decision,
+        reason,
+        kioskName,
+        source,
+        createdAt: now,
+      },
+    }),
+    alertLevel && alertType
+      ? createDeduplicatedAlert({
+          type: alertType,
+          level: alertLevel,
+          title: alertTitle,
+          message: alertMsg,
+          cardUid: uid,
+          memberId: card?.memberId || undefined,
+        })
+      : Promise.resolve(),
+  ]);
 
   const result: ScanResult = {
     decision,

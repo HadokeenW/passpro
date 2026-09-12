@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { Field } from "./Field";
 import { useToast } from "./Toast";
 import { invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 interface MemberModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const MemberModal: React.FC<MemberModalProps> = ({
   initialMember,
 }) => {
   const toast = useToast();
+  const { t, language } = useTranslation();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -56,7 +58,13 @@ export const MemberModal: React.FC<MemberModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim()) {
-      setError("Le prénom et le nom sont requis");
+      setError(
+        language === "ar"
+          ? "الاسم الشخصي واللقب مطلوبان"
+          : language === "en"
+          ? "First and last name are required"
+          : "Le prénom et le nom sont requis"
+      );
       return;
     }
 
@@ -81,41 +89,73 @@ export const MemberModal: React.FC<MemberModalProps> = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error?.message || "Erreur lors de l'enregistrement");
+        throw new Error(
+          data.error?.message ||
+            (language === "ar"
+              ? "حدث خطأ أثناء التسجيل"
+              : language === "en"
+              ? "Error saving member"
+              : "Erreur lors de l'enregistrement")
+        );
       }
 
       invalidateCache(["/api/members", "/api/dashboard"]);
       toast.success(
-        initialMember ? "Adhérent mis à jour" : "Adhérent créé",
-        `${firstName} ${lastName} a été enregistré avec succès`
+        initialMember
+          ? language === "ar"
+            ? "تم تحديث بيانات العضو"
+            : language === "en"
+            ? "Member updated"
+            : "Adhérent mis à jour"
+          : language === "ar"
+          ? "تم إنشاء العضو بنجاح"
+          : language === "en"
+          ? "Member created"
+          : "Adhérent créé",
+        `${firstName} ${lastName}`
       );
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue");
+      setError(
+        err.message ||
+          (language === "ar"
+            ? "حدث خطأ غير متوقع"
+            : language === "en"
+            ? "An error occurred"
+            : "Une erreur est survenue")
+      );
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const labels = {
+    firstName: { fr: "Prénom *", en: "First Name *", ar: "الاسم الشخصي *" },
+    lastName: { fr: "Nom *", en: "Last Name *", ar: "اللقب *" },
+    phone: { fr: "Téléphone", en: "Phone", ar: "رقم الهاتف" },
+    email: { fr: "Email", en: "Email", ar: "البريد الإلكتروني" },
+    notes: { fr: "Notes internes", en: "Internal notes", ar: "ملاحظات داخلية" },
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialMember ? "Modifier le dossier" : "Nouvel adhérent"}
-      description="Renseignez les informations d'identité et de contact"
+      title={initialMember ? t("common.edit") : t("members.newMember")}
+      description={language === "ar" ? "معلومات الهوية والاتصال" : language === "en" ? "Identity & contact information" : "Renseignez les informations d'identité et de contact"}
       size="sm"
       footer={
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
-            Annuler
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"
             onClick={handleSubmit}
             isLoading={isLoading}
           >
-            {initialMember ? "Enregistrer les modifications" : "Créer l'adhérent"}
+            {t("common.save")}
           </Button>
         </div>
       }
@@ -129,14 +169,14 @@ export const MemberModal: React.FC<MemberModalProps> = ({
 
         <div className="grid grid-cols-2 gap-3">
           <Field
-            label="Prénom *"
+            label={labels.firstName[language]}
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="Ex: Amine"
             required
           />
           <Field
-            label="Nom *"
+            label={labels.lastName[language]}
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             placeholder="Ex: Belkacem"
@@ -146,13 +186,13 @@ export const MemberModal: React.FC<MemberModalProps> = ({
 
         <div className="grid grid-cols-2 gap-3">
           <Field
-            label="Téléphone"
+            label={labels.phone[language]}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Ex: 0550 12 34 56"
           />
           <Field
-            label="Email"
+            label={labels.email[language]}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -162,12 +202,12 @@ export const MemberModal: React.FC<MemberModalProps> = ({
 
         <div className="flex flex-col gap-1.5">
           <label className="text-[13px] font-medium text-[#475569]">
-            Notes internes (jamais imprimées sur les reçus)
+            {labels.notes[language]}
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Remarques de santé, préférences, historique..."
+            placeholder="..."
             rows={3}
             className="w-full px-3 py-2 text-[13px] bg-white text-[#0F172A] border border-[#CBD5E1] rounded-[6px] transition-colors focus:border-[#2563EB]"
           />

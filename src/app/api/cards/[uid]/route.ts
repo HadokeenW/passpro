@@ -10,6 +10,38 @@ interface Params {
   params: Promise<{ uid: string }>;
 }
 
+export async function GET(req: NextRequest, { params }: Params) {
+  try {
+    await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);
+    const { uid: rawParamUid } = await params;
+    const uid = normalizeUid(decodeURIComponent(rawParamUid));
+
+    const card = await prisma.card.findUnique({
+      where: { uid },
+      include: {
+        member: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            photoUrl: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!card) {
+      return NextResponse.json({ error: { message: "Carte introuvable" } }, { status: 404 });
+    }
+
+    return NextResponse.json(card);
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const user = await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);

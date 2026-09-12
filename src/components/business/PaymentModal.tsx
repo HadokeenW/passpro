@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { useToast } from "./Toast";
 import { formatMoney } from "@/lib/money";
 import { invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 interface Plan {
   id: string;
@@ -47,6 +48,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   initialDebtSettlement = false,
 }) => {
   const toast = useToast();
+  const { language } = useTranslation();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
@@ -65,6 +67,88 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const activeMember = preselectedMember || members.find((m) => m.id === selectedMemberId);
   const memberDebt = activeMember?.currentSubscription?.balanceDue || 0;
+
+  const tLabels = {
+    title: {
+      fr: "Caisse — Encaissement & Reçus",
+      en: "Cash Register — Checkout & Receipts",
+      ar: "الصندوق — التحصيل والإيصالات",
+    },
+    desc: {
+      fr: "Émission d'un abonnement, encaissement partiel à crédit ou règlement de dette",
+      en: "Issue subscription, partial credit payment, or settle member debt",
+      ar: "إصدار اشتراك أو دفع بالتقسيط أو تسديد دين",
+    },
+    cancel: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
+    subscribeRenew: { fr: "Souscrire / Renouveler", en: "Subscribe / Renew", ar: "اشتراك / تجديد" },
+    settleDebt: { fr: "Régler la dette", en: "Settle Debt", ar: "تسديد الدين" },
+    debt: { fr: "Dette :", en: "Debt:", ar: "دين:" },
+    member: { fr: "Adhérent *", en: "Member *", ar: "المشترك *" },
+    selectMember: { fr: "Sélectionner un adhérent...", en: "Select a member...", ar: "اختر مشتركاً..." },
+    debtSettlementTitle: { fr: "Règlement de la dette adhérent", en: "Member Debt Settlement", ar: "تسديد دين المشترك" },
+    associatedPlan: { fr: "Formule associée :", en: "Associated Plan:", ar: "الاشتراك المرتبط:" },
+    currentDebtDue: { fr: "Solde actuel dû", en: "Current Balance Due", ar: "الرصيد المستحق حالياً" },
+    amountPaidToday: { fr: "Montant versé aujourd'hui (DA) *", en: "Amount Paid Today (DZD) *", ar: "المبلغ المدفوع اليوم (دج) *" },
+    settleAll: { fr: "Tout solder", en: "Pay in Full", ar: "تسديد بالكامل" },
+    remainingAfterPayment: { fr: "Reste à payer après versement :", en: "Remaining Balance after Payment:", ar: "المتبقي بعد الدفع:" },
+    fullyCleared: { fr: "0 DA (Dette totalement soldée)", en: "0 DZD (Debt fully cleared)", ar: "0 دج (تم تسديد الدين بالكامل)" },
+    subscriptionPlan: { fr: "Formule d'abonnement *", en: "Subscription Plan *", ar: "نوع الاشتراك *" },
+    sessions: { fr: "séances", en: "sessions", ar: "حصص" },
+    days: { fr: "jour", en: "day", ar: "يوم" },
+    daysPlural: { fr: "jours", en: "days", ar: "أيام" },
+    paymentTerms: { fr: "Modalité de règlement", en: "Payment Terms", ar: "طريقة السداد" },
+    paymentTermsDesc: {
+      fr: "Encaissement intégral ou paiement à crédit (acompte + reste à payer)",
+      en: "Full payment or credit installment (down payment + remaining balance)",
+      ar: "دفع كامل أو بالتقسيط (دفعة أولى + الرصيد المتبقي)",
+    },
+    full: { fr: "Intégral", en: "Full", ar: "دفع كامل" },
+    credit: { fr: "Crédit / Acompte", en: "Credit / Down Payment", ar: "بالتقسيط / عربون" },
+    totalPrice: { fr: "Tarif total formule :", en: "Total Plan Price:", ar: "السعر الإجمالي للاشتراك:" },
+    paidToday: { fr: "Versé ce jour :", en: "Paid Today:", ar: "المدفوع اليوم:" },
+    balanceDueDebt: { fr: "Reste à payer (Dette) :", en: "Remaining Balance (Debt):", ar: "المتبقي (دين):" },
+    renewalMode: { fr: "Mode de renouvellement", en: "Renewal Mode", ar: "نمط التجديد" },
+    extendTitle: { fr: "Prolongation (EXTEND)", en: "Extension (EXTEND)", ar: "تمديد (EXTEND)" },
+    extendDesc: { fr: "Conserve les jours restants", en: "Keeps remaining days", ar: "الاحتفاظ بالأيام المتبقية" },
+    restartTitle: { fr: "Nouveau départ (RESTART)", en: "Restart (RESTART)", ar: "بداية جديدة (RESTART)" },
+    restartDesc: { fr: "Démarre aujourd'hui", en: "Starts from today", ar: "يبدأ من اليوم" },
+    paymentMethod: { fr: "Mode de règlement", en: "Payment Method", ar: "وسيلة الدفع" },
+    cash: { fr: "Espèces", en: "Cash", ar: "نقداً" },
+    card: { fr: "Carte bancaire", en: "Bank Card", ar: "بطاقة بنكية" },
+    other: { fr: "Autre", en: "Other", ar: "أخرى" },
+    errSelectMember: { fr: "Veuillez sélectionner un adhérent", en: "Please select a member", ar: "يرجى تحديد مشترك" },
+    errDebtGreaterZero: { fr: "Le montant versé pour solder la dette doit être supérieur à 0", en: "Amount paid to settle debt must be greater than 0", ar: "يجب أن يكون المبلغ المدفوع أكبر من 0" },
+    errSelectPlan: { fr: "Veuillez sélectionner une formule", en: "Please select a plan", ar: "يرجى تحديد نوع الاشتراك" },
+    errPaidGreaterZero: { fr: "Le montant versé ce jour doit être supérieur à 0", en: "Amount paid today must be greater than 0", ar: "يجب أن يكون المبلغ المدفوع اليوم أكبر من 0" },
+    errGeneric: { fr: "Une erreur est survenue", en: "An error occurred", ar: "حدث خطأ ما" },
+    collectBalanceBtn: (amt: string) => ({
+      fr: `Encaisser solde : ${amt}`,
+      en: `Collect Balance: ${amt}`,
+      ar: `تحصيل الرصيد: ${amt}`,
+    }),
+    collectDownPaymentBtn: (amt: string) => ({
+      fr: `Encaisser l'acompte : ${amt}`,
+      en: `Collect Down Payment: ${amt}`,
+      ar: `تحصيل الدفعة: ${amt}`,
+    }),
+    collectFullBtn: (amt: string) => ({
+      fr: `Encaisser ${amt}`,
+      en: `Collect ${amt}`,
+      ar: `تحصيل ${amt}`,
+    }),
+    debtNotice: (bal: string) => ({
+      fr: `⚠️ Ce montant restant (${bal}) sera consigné sur le ticket et rappelé lors des prochains passages de l'adhérent.`,
+      en: `⚠️ This remaining balance (${bal}) will appear on the receipt and be recalled on future entries.`,
+      ar: `⚠️ سيتم تسجيل هذا الرصيد المتبقي (${bal}) على الوصل وتذكير المشترك به عند الدخول.`,
+    }),
+    toastDebtSuccess: { fr: "Solde encaissé", en: "Balance Collected", ar: "تم تحصيل الرصيد" },
+    toastSubSuccess: { fr: "Règlement enregistré", en: "Payment Recorded", ar: "تم تسجيل الدفع" },
+    toastReceiptSuccess: (num: string) => ({
+      fr: `Reçu N° ${num} émis avec succès`,
+      en: `Receipt #${num} issued successfully`,
+      ar: `تم إصدار الوصل رقم ${num} بنجاح`,
+    }),
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -126,22 +210,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMemberId) {
-      setError("Veuillez sélectionner un adhérent");
+      setError(tLabels.errSelectMember[language]);
       return;
     }
 
     if (paymentAction === "DEBT") {
       if (parsedDebtPayment <= 0) {
-        setError("Le montant versé pour solder la dette doit être supérieur à 0");
+        setError(tLabels.errDebtGreaterZero[language]);
         return;
       }
     } else {
       if (!selectedPlanId) {
-        setError("Veuillez sélectionner une formule");
+        setError(tLabels.errSelectPlan[language]);
         return;
       }
       if (isCreditMode && actualPaid <= 0) {
-        setError("Le montant versé ce jour doit être supérieur à 0");
+        setError(tLabels.errPaidGreaterZero[language]);
         return;
       }
     }
@@ -174,18 +258,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error?.message || "Erreur lors du règlement");
+        throw new Error(data.error?.message || tLabels.errGeneric[language]);
       }
 
       invalidateCache(["/api/payments", "/api/dashboard", "/api/subscriptions", "/api/members"]);
       toast.success(
-        paymentAction === "DEBT" ? "Solde encaissé" : "Règlement enregistré",
-        `Reçu N° ${data.receiptNumber} émis avec succès`
+        paymentAction === "DEBT" ? tLabels.toastDebtSuccess[language] : tLabels.toastSubSuccess[language],
+        tLabels.toastReceiptSuccess(data.receiptNumber)[language]
       );
       onPaymentSuccess(data.id);
       onClose();
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue");
+      setError(err.message || tLabels.errGeneric[language]);
     } finally {
       setIsLoading(false);
     }
@@ -195,13 +279,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Caisse — Encaissement & Reçus"
-      description="Émission d'un abonnement, encaissement partiel à crédit ou règlement de dette"
+      title={tLabels.title[language]}
+      description={tLabels.desc[language]}
       size="md"
       footer={
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
-            Annuler
+            {tLabels.cancel[language]}
           </Button>
           <Button
             variant="primary"
@@ -209,10 +293,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             isLoading={isLoading}
           >
             {paymentAction === "DEBT"
-              ? `Encaisser solde : ${formatMoney(parsedDebtPayment)}`
+              ? tLabels.collectBalanceBtn(formatMoney(parsedDebtPayment))[language]
               : isCreditMode && balanceDue > 0
-              ? `Encaisser l'acompte : ${formatMoney(actualPaid)}`
-              : `Encaisser ${formatMoney(formulaPrice)}`}
+              ? tLabels.collectDownPaymentBtn(formatMoney(actualPaid))[language]
+              : tLabels.collectFullBtn(formatMoney(formulaPrice))[language]}
           </Button>
         </div>
       }
@@ -236,7 +320,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   : "text-[#64748B] hover:text-[#0F172A]"
               }`}
             >
-              Souscrire / Renouveler
+              {tLabels.subscribeRenew[language]}
             </button>
             <button
               type="button"
@@ -250,7 +334,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   : "text-[#DC2626] hover:bg-[#FEE2E2]"
               }`}
             >
-              <span>Régler la dette</span>
+              <span>{tLabels.settleDebt[language]}</span>
               <span className="nums text-[11px] px-1.5 py-0.2 rounded bg-white/20">
                 {formatMoney(memberDebt)}
               </span>
@@ -261,7 +345,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* Member selector or display */}
         <div>
           <label className="text-[13px] font-semibold text-[#0F172A] mb-1.5 block">
-            Adhérent *
+            {tLabels.member[language]}
           </label>
           {preselectedMember ? (
             <div className="p-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-[6px] flex items-center justify-between">
@@ -272,7 +356,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               {memberDebt > 0 && (
                 <span className="text-[12px] font-bold text-[#DC2626] bg-[#FEF2F2] px-2 py-0.5 rounded border border-[#FECACA] nums">
-                  Dette : {formatMoney(memberDebt)}
+                  {tLabels.debt[language]} {formatMoney(memberDebt)}
                 </span>
               )}
             </div>
@@ -282,7 +366,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               onChange={(e) => setSelectedMemberId(e.target.value)}
               className="w-full h-9 px-3 text-[14px] bg-white text-[#0F172A] border border-[#CBD5E1] rounded-[6px] focus:border-[#2563EB]"
             >
-              <option value="">Sélectionner un adhérent...</option>
+              <option value="">{tLabels.selectMember[language]}</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.firstName} {m.lastName}
@@ -298,14 +382,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[14px] font-bold text-[#991B1B]">
-                  Règlement de la dette adhérent
+                  {tLabels.debtSettlementTitle[language]}
                 </div>
                 <div className="text-[12px] text-[#7F1D1D] mt-0.5">
-                  Formule associée : {activeMember?.currentSubscription?.planName || "Abonnement"}
+                  {tLabels.associatedPlan[language]} {activeMember?.currentSubscription?.planName || "—"}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[11px] text-[#991B1B] font-medium">Solde actuel dû</div>
+                <div className="text-[11px] text-[#991B1B] font-medium">{tLabels.currentDebtDue[language]}</div>
                 <div className="text-[18px] font-bold text-[#DC2626] nums">
                   {formatMoney(memberDebt)}
                 </div>
@@ -314,7 +398,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <div className="pt-2 border-t border-[#FECACA]">
               <label className="text-[13px] font-semibold text-[#0F172A] block mb-1">
-                Montant versé aujourd'hui (DA) *
+                {tLabels.amountPaidToday[language]}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -330,14 +414,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   onClick={() => setDebtPaymentAmount(memberDebt.toString())}
                   className="px-3 py-1.5 text-[12px] font-bold bg-[#DC2626] text-white rounded-[6px] hover:bg-[#B91C1C]"
                 >
-                  Tout solder
+                  {tLabels.settleAll[language]}
                 </button>
               </div>
 
               <div className="mt-2.5 flex items-center justify-between text-[12px] bg-white p-2.5 rounded border border-[#FECACA]">
-                <span className="text-[#64748B]">Reste à payer après versement :</span>
+                <span className="text-[#64748B]">{tLabels.remainingAfterPayment[language]}</span>
                 <span className={`font-bold nums ${remainingDebtAfterPay === 0 ? "text-[#059669]" : "text-[#DC2626]"}`}>
-                  {remainingDebtAfterPay === 0 ? "0 DA (Dette totalement soldée)" : formatMoney(remainingDebtAfterPay)}
+                  {remainingDebtAfterPay === 0 ? tLabels.fullyCleared[language] : formatMoney(remainingDebtAfterPay)}
                 </span>
               </div>
             </div>
@@ -348,7 +432,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Plans Grid Selection */}
             <div>
               <label className="text-[13px] font-semibold text-[#0F172A] mb-2 block">
-                Formule d'abonnement *
+                {tLabels.subscriptionPlan[language]}
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto p-1">
                 {plans.map((p) => {
@@ -378,10 +462,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         </div>
                         <div className="text-[11px] text-[#64748B] mt-0.5">
                           {p.planType === "SESSIONS"
-                            ? `${p.sessionCount || 10} séances`
+                            ? `${p.sessionCount || 10} ${tLabels.sessions[language]}`
                             : p.planType === "TIME_SLOT"
                             ? `${p.startTime || "13:00"} - ${p.endTime || "16:00"}`
-                            : `${p.durationDays} jour${p.durationDays > 1 ? "s" : ""}`}
+                            : `${p.durationDays} ${p.durationDays > 1 ? tLabels.daysPlural[language] : tLabels.days[language]}`}
                         </div>
                       </div>
                       <div className="text-[14px] font-bold text-[#2563EB] mt-1.5 nums">
@@ -398,10 +482,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[13px] font-bold text-[#0F172A]">
-                    Modalité de règlement
+                    {tLabels.paymentTerms[language]}
                   </span>
                   <p className="text-[11px] text-[#64748B]">
-                    Encaissement intégral ou paiement à crédit (acompte + reste à payer)
+                    {tLabels.paymentTermsDesc[language]}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 bg-[#E2E8F0] p-0.5 rounded-[6px] text-[12px]">
@@ -417,7 +501,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : "text-[#64748B] hover:text-[#0F172A]"
                     }`}
                   >
-                    Intégral
+                    {tLabels.full[language]}
                   </button>
                   <button
                     type="button"
@@ -434,7 +518,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : "text-[#64748B] hover:text-[#0F172A]"
                     }`}
                   >
-                    <span>Crédit / Acompte</span>
+                    <span>{tLabels.credit[language]}</span>
                   </button>
                 </div>
               </div>
@@ -444,7 +528,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <label className="text-[12px] font-semibold text-[#0F172A] block mb-1">
-                        Montant versé aujourd'hui (DA) *
+                        {tLabels.amountPaidToday[language]}
                       </label>
                       <input
                         type="number"
@@ -482,20 +566,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       : "bg-[#ECFDF5] border-[#A7F3D0] text-[#047857]"
                   }`}>
                     <div className="flex justify-between items-center">
-                      <span>Tarif total formule :</span>
+                      <span>{tLabels.totalPrice[language]}</span>
                       <span className="font-bold nums">{formatMoney(formulaPrice)}</span>
                     </div>
                     <div className="flex justify-between items-center mt-1">
-                      <span>Versé ce jour :</span>
+                      <span>{tLabels.paidToday[language]}</span>
                       <span className="font-bold nums">{formatMoney(actualPaid)}</span>
                     </div>
                     <div className="flex justify-between items-center mt-1 pt-1 border-t border-current/20 font-bold text-[13px]">
-                      <span>Reste à payer (Dette) :</span>
+                      <span>{tLabels.balanceDueDebt[language]}</span>
                       <span className="nums">{formatMoney(balanceDue)}</span>
                     </div>
                     {balanceDue > 0 && (
                       <p className="text-[11px] mt-2 opacity-90 leading-tight">
-                        ⚠️ Ce montant restant ({formatMoney(balanceDue)}) sera consigné sur le ticket et rappelé lors des prochains passages de l'adhérent.
+                        {tLabels.debtNotice(formatMoney(balanceDue))[language]}
                       </p>
                     )}
                   </div>
@@ -506,7 +590,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Renewal Mode: EXTEND vs RESTART */}
             <div>
               <label className="text-[12px] font-semibold text-[#475569] mb-1.5 block">
-                Mode de renouvellement
+                {tLabels.renewalMode[language]}
               </label>
               <div className="grid grid-cols-2 gap-2.5">
                 <label
@@ -525,11 +609,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       className="accent-[#2563EB]"
                     />
                     <span className="text-[12px] font-semibold text-[#0F172A]">
-                      Prolongation (EXTEND)
+                      {tLabels.extendTitle[language]}
                     </span>
                   </div>
                   <span className="text-[11px] text-[#64748B] pl-5">
-                    Conserve les jours restants
+                    {tLabels.extendDesc[language]}
                   </span>
                 </label>
 
@@ -549,11 +633,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       className="accent-[#2563EB]"
                     />
                     <span className="text-[12px] font-semibold text-[#0F172A]">
-                      Nouveau départ (RESTART)
+                      {tLabels.restartTitle[language]}
                     </span>
                   </div>
                   <span className="text-[11px] text-[#64748B] pl-5">
-                    Démarre aujourd'hui
+                    {tLabels.restartDesc[language]}
                   </span>
                 </label>
               </div>
@@ -564,13 +648,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* Payment Method */}
         <div>
           <label className="text-[12px] font-semibold text-[#475569] mb-1.5 block">
-            Mode de règlement
+            {tLabels.paymentMethod[language]}
           </label>
           <div className="grid grid-cols-3 gap-2.5">
             {[
-              { id: "CASH", label: "Espèces" },
-              { id: "CARD", label: "Carte bancaire" },
-              { id: "OTHER", label: "Autre" },
+              { id: "CASH", label: tLabels.cash[language] },
+              { id: "CARD", label: tLabels.card[language] },
+              { id: "OTHER", label: tLabels.other[language] },
             ].map((m) => (
               <button
                 type="button"

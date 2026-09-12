@@ -37,4 +37,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getServerInfo: () => {
     return ipcRenderer.invoke("get-server-info");
   },
+
+  // Global background RFID scan events
+  onGlobalRfidScan: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on("global-rfid-scan", handler);
+    return () => ipcRenderer.removeListener("global-rfid-scan", handler);
+  },
+
+  // Hide kiosk window after popup timeout
+  hideKioskPopup: () => {
+    ipcRenderer.send("hide-kiosk-popup");
+  },
+
+  // Management mode: suppress Kiosk popup when receptionist is searching/managing
+  setManagementMode: (active) => {
+    ipcRenderer.send("set-management-mode", Boolean(active));
+  },
+  onManagementRfidScan: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on("management-rfid-scan", handler);
+    return () => ipcRenderer.removeListener("management-rfid-scan", handler);
+  },
+
+  // Trigger simulation test popup after specified delay (in seconds)
+  testRfidPopup: (delaySeconds = 3) => {
+    ipcRenderer.send("test-rfid-popup", { delaySeconds });
+  },
 });

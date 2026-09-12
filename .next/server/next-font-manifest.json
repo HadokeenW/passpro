@@ -1,1 +1,47 @@
-{"pages":{},"app":{},"appUsingSizeAdjust":false,"pagesUsingSizeAdjust":false}
+{
+  "app": {
+    "[project]/src/app/(app)/access-logs/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/cards/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/members/[id]/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/members/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/payments/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/plans/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/settings/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/(app)/subscriptions/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ],
+    "[project]/src/app/access/page": [
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2",
+      "static/media/70bc3e132a0a741e-s.p.15008bfb.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

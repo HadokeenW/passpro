@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { useToast } from "./Toast";
-import { Radio, CreditCard, Sparkles, CheckCircle2 } from "lucide-react";
+import { Radio, CreditCard, CheckCircle2 } from "lucide-react";
 import { invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 interface CardAssignModalProps {
   isOpen: boolean;
@@ -25,16 +26,73 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
   currentCardUid,
 }) => {
   const toast = useToast();
+  const { language } = useTranslation();
   const [uid, setUid] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const tLabels = {
+    titleAssign: { fr: "Scanner la carte RFID", en: "Scan RFID Card", ar: "مسح بطاقة RFID" },
+    titleRegister: { fr: "Enregistrer un badge", en: "Register RFID Card", ar: "تسجيل بطاقة جديدة" },
+    descAssign: (mName?: string) => ({
+      fr: `Approchez le badge du lecteur pour l'associer à ${mName || "l'adhérent"}`,
+      en: `Tap the card on the reader to associate with ${mName || "the member"}`,
+      ar: `قرّب البطاقة من القارئ لربطها بـ ${mName || "المشترك"}`,
+    }),
+    descRegister: {
+      fr: "Approchez le badge du lecteur RFID pour l'enregistrer dans le système",
+      en: "Tap the badge on the RFID reader to register it in the system",
+      ar: "قرّب البطاقة من القارئ لتسجيلها في النظام",
+    },
+    cancel: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
+    validateCard: { fr: "Valider le badge", en: "Validate Card", ar: "تأكيد البطاقة" },
+    registerCard: { fr: "Enregistrer", en: "Save", ar: "حفظ" },
+    scanBoxTitle: { fr: "Scannez la carte maintenant", en: "Scan Card Now", ar: "امسح البطاقة الآن" },
+    scanBoxDesc: {
+      fr: "Placez le badge RFID 13,56 MHz sur le lecteur USB connecté au poste",
+      en: "Place the 13.56 MHz RFID badge on the USB reader connected to terminal",
+      ar: "ضع بطاقة RFID ذات التردد 13.56 ميغاهرتز على قارئ USB المتصل بالجهاز",
+    },
+    currentCardWarning: (uidStr: string) => ({
+      fr: `Badge actuel : ${uidStr} (sera remplacé).`,
+      en: `Current badge: ${uidStr} (will be replaced).`,
+      ar: `البطاقة الحالية: ${uidStr} (سيتم استبدالها).`,
+    }),
+    uidLabel: { fr: "Numéro de série / UID du badge *", en: "Card Serial Number / UID *", ar: "الرقم التسلسلي للبطاقة UID *" },
+    uidPlaceholder: {
+      fr: "En attente de scan... (ex: 04:A3:2B:F1)",
+      en: "Waiting for scan... (e.g. 04:A3:2B:F1)",
+      ar: "في انتظار المسح... (مثال: 04:A3:2B:F1)",
+    },
+    uidHelp: {
+      fr: "Détecte automatiquement la frappe clavier du lecteur RFID USB et valide avec Entrée.",
+      en: "Automatically detects USB RFID reader keyboard strokes and confirms with Enter.",
+      ar: "يتعرف تلقائياً على إدخال قارئ بطاقات RFID USB ويؤكد بالضغط على Enter.",
+    },
+    errEmpty: {
+      fr: "Veuillez scanner ou saisir le numéro de badge",
+      en: "Please scan or enter the card number",
+      ar: "يرجى مسح أو إدخال رقم البطاقة",
+    },
+    toastAssignedTitle: { fr: "Badge attribué", en: "Card Assigned", ar: "تم تعيين البطاقة" },
+    toastAssignedDesc: (cUid: string, mName?: string) => ({
+      fr: `Le badge ${cUid} est maintenant associé à ${mName || "l'adhérent"}`,
+      en: `Card ${cUid} is now associated with ${mName || "the member"}`,
+      ar: `البطاقة ${cUid} مرتبطة الآن بـ ${mName || "المشترك"}`,
+    }),
+    toastRegisteredTitle: { fr: "Badge enregistré", en: "Card Registered", ar: "تم تسجيل البطاقة" },
+    toastRegisteredDesc: (cUid: string) => ({
+      fr: `Le badge ${cUid} a été enregistré`,
+      en: `Card ${cUid} has been registered`,
+      ar: `تم تسجيل البطاقة ${cUid}`,
+    }),
+  };
+
   useEffect(() => {
     if (isOpen) {
       setUid("");
       setError("");
-      // Automatically focus the input for immediate RFID scan
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 80);
@@ -46,7 +104,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
     if (e) e.preventDefault();
     const cleanUid = uid.trim().toUpperCase();
     if (!cleanUid) {
-      setError("Veuillez scanner ou saisir le numéro de badge");
+      setError(tLabels.errEmpty[language]);
       inputRef.current?.focus();
       return;
     }
@@ -78,8 +136,8 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
         }
 
         toast.success(
-          "Badge attribué",
-          `Le badge ${cleanUid} est maintenant associé à ${memberName || "l'adhérent"}`
+          tLabels.toastAssignedTitle[language],
+          tLabels.toastAssignedDesc(cleanUid, memberName)[language]
         );
       } else {
         // Register card into system
@@ -91,7 +149,10 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
         const createData = await createRes.json();
         if (!createRes.ok) throw new Error(createData.error?.message || "Erreur d'enregistrement");
 
-        toast.success("Badge enregistré", `Le badge ${cleanUid} a été enregistré`);
+        toast.success(
+          tLabels.toastRegisteredTitle[language],
+          tLabels.toastRegisteredDesc(cleanUid)[language]
+        );
       }
 
       invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
@@ -108,17 +169,17 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={memberId ? "Scanner la carte RFID" : "Enregistrer un badge"}
+      title={memberId ? tLabels.titleAssign[language] : tLabels.titleRegister[language]}
       description={
         memberId
-          ? `Approchez le badge du lecteur pour l'associer à ${memberName}`
-          : "Approchez le badge du lecteur RFID pour l'enregistrer dans le système"
+          ? tLabels.descAssign(memberName)[language]
+          : tLabels.descRegister[language]
       }
       size="sm"
       footer={
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
-            Annuler
+            {tLabels.cancel[language]}
           </Button>
           <Button
             variant="primary"
@@ -126,7 +187,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
             isLoading={isLoading}
             disabled={!uid.trim()}
           >
-            {memberId ? "Valider le badge" : "Enregistrer"}
+            {memberId ? tLabels.validateCard[language] : tLabels.registerCard[language]}
           </Button>
         </div>
       }
@@ -144,10 +205,10 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
             <Radio className="w-7 h-7 animate-spin-slow" />
           </div>
           <div className="text-[15px] font-bold text-[#0F172A]">
-            Scannez la carte maintenant
+            {tLabels.scanBoxTitle[language]}
           </div>
           <p className="text-[12px] text-[#64748B] mt-1 max-w-[260px]">
-            Placez le badge RFID 13,56 MHz sur le lecteur USB connecté au poste
+            {tLabels.scanBoxDesc[language]}
           </p>
         </div>
 
@@ -155,7 +216,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
           <div className="p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-[8px] text-[12px] text-[#B45309] flex items-center gap-2">
             <CreditCard className="w-4 h-4 shrink-0" />
             <span>
-              Badge actuel : <strong className="font-mono-code">{currentCardUid}</strong> (sera remplacé).
+              {tLabels.currentCardWarning(currentCardUid)[language]}
             </span>
           </div>
         )}
@@ -163,7 +224,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
         {/* UID Input with Auto-focus */}
         <div>
           <label className="text-[13px] font-medium text-[#475569] mb-1.5 block">
-            Numéro de série / UID du badge *
+            {tLabels.uidLabel[language]}
           </label>
           <div className="relative">
             <input
@@ -172,7 +233,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
               autoFocus
               value={uid}
               onChange={(e) => setUid(e.target.value)}
-              placeholder="En attente de scan... (ex: 04:A3:2B:F1)"
+              placeholder={tLabels.uidPlaceholder[language]}
               className="w-full h-11 px-3.5 bg-white border border-[#CBD5E1] rounded-[8px] text-[14px] font-mono-code font-semibold tracking-wide text-[#0F172A] placeholder:text-[#94A3B8] placeholder:font-normal focus:border-[#2563EB] focus:ring-2 focus:ring-blue-100"
               required
             />
@@ -181,7 +242,7 @@ export const CardAssignModal: React.FC<CardAssignModalProps> = ({
             )}
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1">
-            Détecte automatiquement la frappe clavier du lecteur RFID USB et valide avec Entrée.
+            {tLabels.uidHelp[language]}
           </p>
         </div>
       </form>

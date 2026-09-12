@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/business/Button";
 import { Card } from "@/components/business/Card";
@@ -9,16 +8,16 @@ import { SearchInput } from "@/components/business/SearchInput";
 import { FilterPills } from "@/components/business/FilterPills";
 import { StatusPill } from "@/components/business/StatusPill";
 import { EmptyState } from "@/components/business/EmptyState";
-import { MemberModal } from "@/components/business/MemberModal";
 import { Users, UserPlus, ChevronLeft, ChevronRight, CreditCard, Download } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { downloadCsv } from "@/lib/csv";
-
 import { getCachedData, setCachedData } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function MembersPage() {
   const router = useRouter();
+  const { t, language } = useTranslation();
   const initialCacheKey = "/api/members?page=1&pageSize=15&filter=all&q=";
   const initialData = getCachedData<any>(initialCacheKey);
 
@@ -28,7 +27,6 @@ export default function MembersPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(() => !initialData);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchMembers = () => {
     const params = new URLSearchParams({
@@ -77,29 +75,31 @@ export default function MembersPage() {
   }, [page, filter, search]);
 
   const filterOptions = [
-    { label: "Tous", value: "all" },
-    { label: "Actifs", value: "active" },
-    { label: "Inactifs", value: "inactive" },
-    { label: "Avec dette / crédit", value: "debt" },
-    { label: "Cartes bloquées", value: "blocked" },
+    { label: t("members.filters.all"), value: "all" },
+    { label: t("members.filters.active"), value: "active" },
+    { label: t("members.filters.inactive"), value: "inactive" },
+    { label: t("members.filters.debt"), value: "debt" },
+    { label: t("members.filters.blocked"), value: "blocked" },
   ];
+
+  const tLabels = {
+    csvHeaders: {
+      fr: ["Nom", "Prénom", "Téléphone", "Email", "Badge RFID", "Formule", "Statut Abonnement", "Échéance", "Date Inscription"],
+      en: ["Last Name", "First Name", "Phone", "Email", "RFID Badge", "Plan", "Subscription Status", "Expiry Date", "Registration Date"],
+      ar: ["اللقب", "الاسم", "الهاتف", "البريد الإلكتروني", "بطاقة RFID", "الاشتراك", "حالة الاشتراك", "تاريخ الانتهاء", "تاريخ التسجيل"],
+    },
+    expiryHeader: { fr: "Échéance", en: "Expiry Date", ar: "تاريخ الانتهاء" },
+    dueLabel: { fr: "Reste :", en: "Due:", ar: "متبقي:" },
+    sessionsUnit: { fr: "séanc.", en: "sess.", ar: "حصص" },
+    noCard: { fr: "Aucun badge", en: "No card", ar: "بدون بطاقة" },
+  };
 
   const handleExportCsv = async () => {
     try {
       const res = await fetch(`/api/members?pageSize=1000&filter=${filter}&q=${encodeURIComponent(search)}`);
       const data = await res.json();
       const items = data.items || members;
-      const headers = [
-        "Nom",
-        "Prénom",
-        "Téléphone",
-        "Email",
-        "Badge RFID",
-        "Formule",
-        "Statut Abonnement",
-        "Échéance",
-        "Date Inscription",
-      ];
+      const headers = tLabels.csvHeaders[language];
       const rows = items.map((m: any) => {
         const sub = m.currentSubscription;
         return [
@@ -108,12 +108,12 @@ export default function MembersPage() {
           m.phone || "",
           m.email || "",
           m.activeCard?.uid || "",
-          sub?.planName || "Aucun",
+          sub?.planName || (language === "ar" ? "لا يوجد" : "Aucun"),
           sub?.status === "ACTIVE"
-            ? "Actif"
+            ? (language === "ar" ? "نشط" : language === "en" ? "Active" : "Actif")
             : sub?.status === "EXPIRING_SOON"
-            ? "Expire bientôt"
-            : sub?.status || "Inactif",
+            ? (language === "ar" ? "ينتهي قريباً" : language === "en" ? "Expiring soon" : "Expire bientôt")
+            : sub?.status || (language === "ar" ? "غير نشط" : "Inactif"),
           sub?.endDate ? formatDate(sub.endDate) : "",
           formatDate(m.createdAt),
         ];
@@ -132,10 +132,10 @@ export default function MembersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Adhérents
+            {t("members.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Répertoire des membres, abonnements et attribution des badges
+            {t("members.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -144,14 +144,18 @@ export default function MembersPage() {
             leftIcon={<Download className="w-4 h-4" />}
             onClick={handleExportCsv}
           >
-            Exporter CSV
+            {t("members.exportCsv")}
           </Button>
           <Button
             variant="primary"
             leftIcon={<UserPlus className="w-4 h-4" />}
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("passpro:open-onboarding"));
+              }
+            }}
           >
-            Créer un adhérent
+            {t("members.newMember")}
           </Button>
         </div>
       </div>
@@ -159,7 +163,7 @@ export default function MembersPage() {
       {/* 2. Toolbar: Search + FilterPills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-[10px] border border-[#E2E8F0]">
         <SearchInput
-          placeholder="Rechercher par nom, téléphone, badge..."
+          placeholder={t("members.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -181,16 +185,23 @@ export default function MembersPage() {
       <Card noPadding>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-[#64748B] text-[14px]">
-            Chargement des adhérents...
+            {t("members.loading")}
           </div>
         ) : members.length === 0 ? (
           <EmptyState
             icon={<Users className="w-8 h-8" />}
-            title="Aucun adhérent trouvé"
-            description="Modifiez vos filtres de recherche ou créez un nouvel adhérent."
+            title={t("members.emptyTitle")}
+            description={t("members.emptyDesc")}
             action={
-              <Button variant="secondary" onClick={() => setIsModalOpen(true)}>
-                Créer un adhérent
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("passpro:open-onboarding"));
+                  }
+                }}
+              >
+                {t("members.newMember")}
               </Button>
             }
           />
@@ -199,12 +210,12 @@ export default function MembersPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="h-10 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <th className="px-5">Adhérent</th>
-                  <th className="px-4">Coordonnées</th>
-                  <th className="px-4">Abonnement actuel</th>
-                  <th className="px-4">Badge RFID</th>
-                  <th className="px-4">Échéance</th>
-                  <th className="px-5 text-right">Statut</th>
+                  <th className="px-5">{t("members.table.member")}</th>
+                  <th className="px-4">{t("members.table.contact")}</th>
+                  <th className="px-4">{t("members.table.planValidity")}</th>
+                  <th className="px-4">{t("members.table.card")}</th>
+                  <th className="px-4">{tLabels.expiryHeader[language]}</th>
+                  <th className="px-5 text-right">{t("members.table.status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -227,7 +238,7 @@ export default function MembersPage() {
                             <span>{m.subscription.planName}</span>
                             {m.subscription.planType === "SESSIONS" && (
                               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                                {m.subscription.remainingSessions ?? 0} séanc.
+                                {m.subscription.remainingSessions ?? 0} {tLabels.sessionsUnit[language]}
                               </span>
                             )}
                             {m.subscription.planType === "TIME_SLOT" && (
@@ -239,7 +250,7 @@ export default function MembersPage() {
                           {m.subscription.balanceDue > 0 && (
                             <div>
                               <span className="text-[11px] font-bold px-1.5 py-0.2 rounded bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
-                                Reste : {formatMoney(m.subscription.balanceDue)}
+                                {tLabels.dueLabel[language]} {formatMoney(m.subscription.balanceDue)}
                               </span>
                             </div>
                           )}
@@ -255,7 +266,7 @@ export default function MembersPage() {
                           <span>{m.card.uid}</span>
                         </div>
                       ) : (
-                        <span className="text-[12px] text-[#94A3B8]">Aucun badge</span>
+                        <span className="text-[12px] text-[#94A3B8]">{tLabels.noCard[language]}</span>
                       )}
                     </td>
                     <td className="px-4 text-[#64748B] nums">
@@ -280,35 +291,41 @@ export default function MembersPage() {
         {/* Pagination Footer */}
         <div className="h-12 px-5 border-t border-[#F1F5F9] flex items-center justify-between text-[13px] text-[#64748B]">
           <div>
-            Affichage de <span className="font-semibold text-[#0F172A] nums">{members.length}</span> sur{" "}
-            <span className="font-semibold text-[#0F172A] nums">{total}</span> adhérents
+            {total > 0 && (
+              <>
+                {t("members.pagination.showing")}{" "}
+                <span className="font-medium text-[#0F172A] nums">
+                  {(page - 1) * 15 + 1}
+                </span>{" "}
+                {t("members.pagination.to")}{" "}
+                <span className="font-medium text-[#0F172A] nums">
+                  {Math.min(page * 15, total)}
+                </span>{" "}
+                {t("members.pagination.of")}{" "}
+                <span className="font-medium text-[#0F172A] nums">{total}</span>{" "}
+                {t("members.pagination.members")}
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
             <span className="px-2 font-medium nums">{page}</span>
             <button
               disabled={page * 15 >= total}
               onClick={() => setPage((p) => p + 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         </div>
       </Card>
-
-      {/* Creation Modal */}
-      <MemberModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchMembers}
-      />
     </div>
   );
 }

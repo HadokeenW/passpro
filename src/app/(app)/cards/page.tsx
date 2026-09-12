@@ -21,13 +21,14 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  UserCheck,
 } from "lucide-react";
 
 import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function CardsPage() {
   const toast = useToast();
+  const { t, language } = useTranslation();
   const initialCacheKey = "/api/cards?page=1&pageSize=15&status=all&q=";
   const initialData = getCachedData<any>(initialCacheKey);
 
@@ -102,8 +103,10 @@ export default function CardsPage() {
       if (res.ok) {
         invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
         toast.success(
-          action === "BLOCK" ? "Badge bloqué" : "Badge débloqué",
-          `Le badge ${uid} a été mis à jour`
+          action === "BLOCK"
+            ? language === "ar" ? "تم حظر البطاقة" : language === "en" ? "Card blocked" : "Badge bloqué"
+            : language === "ar" ? "تم إلغاء حظر البطاقة" : language === "en" ? "Card unblocked" : "Badge débloqué",
+          uid
         );
         fetchCards();
       }
@@ -120,7 +123,10 @@ export default function CardsPage() {
       });
       if (res.ok) {
         invalidateCache(["/api/cards", "/api/dashboard", "/api/members"]);
-        toast.success("Badge retiré", `Le badge ${cardToDelete} a été sorti du parc`);
+        toast.success(
+          language === "ar" ? "تم حذف البطاقة" : language === "en" ? "Card removed" : "Badge retiré",
+          cardToDelete
+        );
         fetchCards();
       }
     } catch (err) {
@@ -131,10 +137,26 @@ export default function CardsPage() {
   };
 
   const filterOptions = [
-    { label: "Toutes", value: "all", count: counts.total },
-    { label: "Actives", value: "active", count: counts.active },
-    { label: "Bloquées", value: "blocked", count: counts.blocked },
+    { label: t("cards.filters.all"), value: "all", count: counts.total },
+    { label: t("cards.filters.active"), value: "active", count: counts.active },
+    { label: t("cards.filters.blocked"), value: "blocked", count: counts.blocked },
   ];
+
+  const tLabels = {
+    kpiAllCtx: { fr: "Identifiants enregistrés", en: "Registered credentials", ar: "البطاقات المسجلة" },
+    kpiActiveCtx: { fr: "En circulation chez les membres", en: "Active in member circulation", ar: "بحوزة المشتركين النشطين" },
+    kpiBlockedCtx: { fr: "Perte, vol ou exclusion", en: "Lost, stolen or suspended", ar: "ضياع، سرقة أو منع" },
+    deleteModalDesc: {
+      fr: "Cette action retire définitivement la carte du stock.",
+      en: "This permanently removes the card from inventory.",
+      ar: "هذا الإجراء يحذف البطاقة نهائياً من المخزون.",
+    },
+    deleteModalBody: (uid: string) => ({
+      fr: `Êtes-vous certain de vouloir supprimer le badge ${uid} du parc ? Les historiques de passages conserveront son identifiant texte.`,
+      en: `Are you sure you want to remove card ${uid} from the inventory? Passages history will retain its text identifier.`,
+      ar: `هل أنت متأكد من رغبتك في حذف البطاقة ${uid} من النظام؟ سيحتفظ سجل الدخول برقم البطاقة للأرشفة.`,
+    }),
+  };
 
   return (
     <div className="space-y-6">
@@ -142,10 +164,10 @@ export default function CardsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Parc de cartes RFID
+            {t("cards.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Inventaire des badges 13,56 MHz, attributions et blocages d'accès
+            {t("cards.subtitle")}
           </p>
         </div>
         <Button
@@ -153,28 +175,28 @@ export default function CardsPage() {
           leftIcon={<Plus className="w-4 h-4" />}
           onClick={() => setIsAssignModalOpen(true)}
         >
-          Scanner un badge
+          {t("cards.scanCard")}
         </Button>
       </div>
 
       {/* 2. Compact KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard
-          label="Total des badges"
+          label={t("cards.filters.all")}
           value={counts.total}
-          context="Identifiants enregistrés"
+          context={tLabels.kpiAllCtx[language]}
           icon={<CreditCard className="w-5 h-5" />}
         />
         <KpiCard
-          label="Badges actifs"
+          label={t("cards.kpiActive")}
           value={counts.active}
-          context="En circulation chez les membres"
+          context={tLabels.kpiActiveCtx[language]}
           icon={<ShieldCheck className="w-5 h-5" />}
         />
         <KpiCard
-          label="Badges bloqués"
+          label={t("cards.kpiBlocked")}
           value={counts.blocked}
-          context="Perte, vol ou exclusion"
+          context={tLabels.kpiBlockedCtx[language]}
           variant="alert"
           icon={<Ban className="w-5 h-5" />}
         />
@@ -183,7 +205,7 @@ export default function CardsPage() {
       {/* 3. Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-[10px] border border-[#E2E8F0]">
         <SearchInput
-          placeholder="Rechercher par UID ou adhérent..."
+          placeholder={t("cards.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -205,25 +227,24 @@ export default function CardsPage() {
       <Card noPadding>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-[#64748B] text-[14px]">
-            Chargement des badges RFID...
+            {t("cards.loading")}
           </div>
         ) : cards.length === 0 ? (
           <EmptyState
             icon={<CreditCard className="w-8 h-8" />}
-            title="Aucun badge trouvé"
-            description="Aucun badge RFID ne correspond aux critères de recherche."
+            title={t("cards.emptyTitle")}
+            description={t("cards.emptyDesc")}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-[13px]">
               <thead>
                 <tr className="h-10 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <th className="px-5">UID Badge</th>
-                  <th className="px-4">Adhérent assigné</th>
-                  <th className="px-4">Dernier passage</th>
-                  <th className="px-4">Enregistré le</th>
-                  <th className="px-4 text-center">Statut</th>
-                  <th className="px-5 text-right">Actions</th>
+                  <th className="px-5">{t("cards.table.uid")}</th>
+                  <th className="px-4">{t("cards.table.member")}</th>
+                  <th className="px-4">{t("cards.table.assignedAt")}</th>
+                  <th className="px-4 text-center">{t("cards.table.status")}</th>
+                  <th className="px-5 text-right">{t("cards.table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -241,11 +262,8 @@ export default function CardsPage() {
                           {c.member.firstName} {c.member.lastName}
                         </Link>
                       ) : (
-                        <span className="text-[12px] text-[#94A3B8]">Stock (non attribué)</span>
+                        <span className="text-[12px] text-[#94A3B8]">{t("cards.kpiUnassigned")}</span>
                       )}
-                    </td>
-                    <td className="px-4 text-[#64748B] nums">
-                      {c.lastSeenAt ? formatDateTime(c.lastSeenAt) : "Jamais"}
                     </td>
                     <td className="px-4 text-[#64748B] nums">{formatDateTime(c.createdAt)}</td>
                     <td className="px-4 text-center">
@@ -255,8 +273,8 @@ export default function CardsPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleToggleBlock(c.uid, c.status)}
-                          title={c.status === "BLOCKED" ? "Débloquer" : "Bloquer"}
-                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
+                          title={c.status === "BLOCKED" ? t("cards.actions.unblock") : t("cards.actions.block")}
+                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors cursor-pointer"
                         >
                           {c.status === "BLOCKED" ? (
                             <ShieldCheck className="w-4 h-4 text-[#059669]" />
@@ -266,8 +284,8 @@ export default function CardsPage() {
                         </button>
                         <button
                           onClick={() => setCardToDelete(c.uid)}
-                          title="Supprimer du parc"
-                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+                          title={t("cards.actions.delete")}
+                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -283,24 +301,38 @@ export default function CardsPage() {
         {/* Pagination Footer */}
         <div className="h-12 px-5 border-t border-[#F1F5F9] flex items-center justify-between text-[13px] text-[#64748B]">
           <div>
-            Affichage de <span className="font-semibold text-[#0F172A] nums">{cards.length}</span> sur{" "}
-            <span className="font-semibold text-[#0F172A] nums">{total}</span> badges
+            {language === "ar" ? (
+              <>
+                عرض <span className="font-semibold text-[#0F172A] nums">{cards.length}</span> من أصل{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            ) : language === "en" ? (
+              <>
+                Showing <span className="font-semibold text-[#0F172A] nums">{cards.length}</span> of{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            ) : (
+              <>
+                Affichage de <span className="font-semibold text-[#0F172A] nums">{cards.length}</span> sur{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
             <span className="px-2 font-medium nums">{page}</span>
             <button
               disabled={page * 15 >= total}
               onClick={() => setPage((p) => p + 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         </div>
@@ -317,23 +349,21 @@ export default function CardsPage() {
       <Modal
         isOpen={!!cardToDelete}
         onClose={() => setCardToDelete(null)}
-        title="Sortie de parc"
-        description="Cette action retire définitivement la carte du stock."
+        title={t("cards.actions.delete")}
+        description={tLabels.deleteModalDesc[language]}
         footer={
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => setCardToDelete(null)}>
-              Annuler
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" onClick={handleDeleteCard}>
-              Supprimer la carte
+              {t("common.delete")}
             </Button>
           </div>
         }
       >
         <p className="text-[13px] text-[#475569]">
-          Êtes-vous certain de vouloir supprimer le badge{" "}
-          <strong className="font-mono-code">{cardToDelete}</strong> du parc ? Les historiques
-          de passages conserveront son identifiant texte.
+          {cardToDelete && tLabels.deleteModalBody(cardToDelete)[language]}
         </p>
       </Modal>
     </div>

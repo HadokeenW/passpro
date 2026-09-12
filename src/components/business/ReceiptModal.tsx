@@ -4,6 +4,7 @@ import { Button } from "./Button";
 import { Printer } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { formatDateTime, formatDate } from "@/lib/dates";
+import { useTranslation } from "@/lib/i18n";
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -49,9 +50,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   onClose,
   receiptData,
 }) => {
+  const { language } = useTranslation();
   if (!receiptData) return null;
 
-  const { payment, setting, isDuplicate } = receiptData;
+  const { payment, setting } = receiptData;
 
   const handlePrint = () => {
     if (typeof window !== "undefined" && (window as any).electronAPI?.printReceipt) {
@@ -90,25 +92,48 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     window.print();
   };
 
-  const methodLabels: Record<string, string> = {
-    CASH: "Espèces",
-    CARD: "Carte bancaire",
-    OTHER: "Autre",
+  const tLabels = {
+    title: { fr: "Reçu d'encaissement", en: "Payment Receipt", ar: "وصل الدفع" },
+    close: { fr: "Fermer", en: "Close", ar: "إغلاق" },
+    print: { fr: "Imprimer le reçu (80 mm)", en: "Print Receipt (80 mm)", ar: "طباعة الوصل (80 مم)" },
+    tel: { fr: "Tél :", en: "Tel:", ar: "هاتف:" },
+    receiptNo: { fr: "N° REÇU :", en: "RECEIPT #:", ar: "رقم الوصل:" },
+    date: { fr: "DATE :", en: "DATE:", ar: "التاريخ:" },
+    member: { fr: "ADHÉRENT :", en: "MEMBER:", ar: "المشترك:" },
+    period: { fr: "Période :", en: "Period:", ar: "الفترة:" },
+    to: { fr: "au", en: "to", ar: "إلى" },
+    planPrice: { fr: "Prix formule :", en: "Plan Price:", ar: "سعر الاشتراك:" },
+    totalPaid: { fr: "TOTAL RÉGLÉ", en: "TOTAL PAID", ar: "المجموع المدفوع" },
+    remainingDue: { fr: "RESTE À PAYER :", en: "BALANCE DUE:", ar: "المتبقي للدفع:" },
+    paymentMethod: { fr: "Mode de règlement :", en: "Payment Method:", ar: "طريقة الدفع:" },
+    cashier: { fr: "Opérateur caisse :", en: "Cashier:", ar: "مسؤول الصندوق:" },
+    methods: {
+      CASH: { fr: "Espèces", en: "Cash", ar: "نقداً" },
+      CARD: { fr: "Carte bancaire", en: "Bank Card", ar: "بطاقة بنكية" },
+      OTHER: { fr: "Autre", en: "Other", ar: "أخرى" },
+    },
+    defaultFooter: {
+      fr: "Merci de votre fidélité et à bientôt !",
+      en: "Thank you for your business, see you soon!",
+      ar: "شكراً لوفائكم وإلى اللقاء قريباً!",
+    },
   };
+
+  const methodLabel = tLabels.methods[payment.method as keyof typeof tLabels.methods]?.[language] || payment.method;
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Reçu d'encaissement"
+      title={tLabels.title[language]}
       size="md"
       footer={
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={onClose}>
-            Fermer
+            {tLabels.close[language]}
           </Button>
           <Button variant="primary" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
-            Imprimer le reçu (80 mm)
+            {tLabels.print[language]}
           </Button>
         </div>
       }
@@ -119,8 +144,6 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           id="thermal-receipt"
           className="w-[280px] bg-white p-5 rounded-[4px] shadow-sm border border-[#CBD5E1] text-[#0F172A] font-sans text-[12px] flex flex-col gap-3 leading-relaxed"
         >
-
-
           {/* Gym Header */}
           <div className="text-center">
             <h3 className="text-[14px] font-bold tracking-tight">
@@ -130,7 +153,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               <p className="text-[11px] text-[#64748B] mt-0.5">{setting.gymAddress}</p>
             )}
             {setting?.gymPhone && (
-              <p className="text-[11px] text-[#64748B]">Tél : {setting.gymPhone}</p>
+              <p className="text-[11px] text-[#64748B]">{tLabels.tel[language]} {setting.gymPhone}</p>
             )}
           </div>
 
@@ -138,21 +161,21 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
           {/* Receipt Info */}
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-[#64748B]">N° REÇU :</span>
+            <span className="text-[#64748B]">{tLabels.receiptNo[language]}</span>
             <span className="font-mono-code font-bold text-[#0F172A]">
               {payment.receiptNumber}
             </span>
           </div>
 
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-[#64748B]">DATE :</span>
+            <span className="text-[#64748B]">{tLabels.date[language]}</span>
             <span className="font-medium text-[#0F172A]">
               {formatDateTime(payment.createdAt)}
             </span>
           </div>
 
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-[#64748B]">ADHÉRENT :</span>
+            <span className="text-[#64748B]">{tLabels.member[language]}</span>
             <span className="font-semibold text-[#0F172A] truncate max-w-[170px]">
               {payment.member.firstName} {payment.member.lastName}
             </span>
@@ -171,9 +194,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
             {payment.subscription && (
               <div className="text-[11px] text-[#64748B] flex justify-between">
-                <span>Période :</span>
+                <span>{tLabels.period[language]}</span>
                 <span>
-                  {formatDate(payment.subscription.startDate)} au{" "}
+                  {formatDate(payment.subscription.startDate)} {tLabels.to[language]}{" "}
                   {formatDate(payment.subscription.endDate)}
                 </span>
               </div>
@@ -185,7 +208,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           {/* Total & Payment Method */}
           {payment.totalAmount && payment.totalAmount !== payment.amount && (
             <div className="flex justify-between items-center text-[11px] text-[#64748B]">
-              <span>Prix formule :</span>
+              <span>{tLabels.planPrice[language]}</span>
               <span className="nums font-semibold text-[#0F172A]">
                 {formatMoney(payment.totalAmount, setting?.currency || "DA")}
               </span>
@@ -193,7 +216,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           )}
 
           <div className="flex justify-between items-center text-[14px] font-bold">
-            <span>TOTAL RÉGLÉ</span>
+            <span>{tLabels.totalPaid[language]}</span>
             <span className="nums text-[15px]">
               {formatMoney(payment.amount, setting?.currency || "DA")}
             </span>
@@ -201,7 +224,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
           {payment.remainingBalance !== undefined && payment.remainingBalance !== null && payment.remainingBalance > 0 && (
             <div className="p-2 bg-[#FEF2F2] border border-dashed border-[#FECACA] rounded text-[12px] font-bold text-[#DC2626] flex justify-between items-center">
-              <span>RESTE À PAYER :</span>
+              <span>{tLabels.remainingDue[language]}</span>
               <span className="nums text-[13px]">
                 {formatMoney(payment.remainingBalance, setting?.currency || "DA")}
               </span>
@@ -209,15 +232,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           )}
 
           <div className="flex justify-between items-center text-[11px] text-[#64748B]">
-            <span>Mode de règlement :</span>
+            <span>{tLabels.paymentMethod[language]}</span>
             <span className="font-medium text-[#0F172A]">
-              {methodLabels[payment.method] || payment.method}
+              {methodLabel}
             </span>
           </div>
 
           {payment.operator && (
             <div className="flex justify-between items-center text-[11px] text-[#64748B]">
-              <span>Opérateur caisse :</span>
+              <span>{tLabels.cashier[language]}</span>
               <span className="font-medium text-[#0F172A]">{payment.operator.name}</span>
             </div>
           )}
@@ -226,7 +249,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
           {/* Footer message */}
           <div className="text-center text-[11px] text-[#64748B] italic pt-1">
-            {setting?.receiptFooter || "Merci de votre fidélité et à bientôt !"}
+            {setting?.receiptFooter || tLabels.defaultFooter[language]}
           </div>
         </div>
       </div>

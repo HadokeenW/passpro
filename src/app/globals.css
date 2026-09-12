@@ -45,6 +45,7 @@
     color: var(--text);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   *:focus-visible {
@@ -235,4 +236,23 @@ aside[aria-label="Next.js"] {
 
 .app-no-drag {
   -webkit-app-region: no-drag;
+}
+
+/* Arabic Typography & Native RTL Support */
+[dir="rtl"] {
+  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  letter-spacing: normal;
+}
+
+[dir="rtl"] .font-mono-code {
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  direction: ltr;
+  display: inline-block;
+}
+
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] .nums {
+  direction: ltr;
+  unicode-bidi: embed;
 }

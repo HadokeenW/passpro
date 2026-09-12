@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { errorResponse } from "@/lib/errors";
+import { normalizeUid } from "@/server/services/access-engine";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,16 +14,45 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ members: [], cards: [], plans: [] });
     }
 
+    const normQ = q.length >= 4 ? normalizeUid(q) : "";
+    const words = q.split(/\s+/).filter(Boolean);
+    const memberOr: any[] = [
+      { firstName: { contains: q } },
+      { lastName: { contains: q } },
+      { phone: { contains: q } },
+      { email: { contains: q } },
+      { cards: { some: { uid: { contains: q.toUpperCase() } } } },
+    ];
+    if (words.length > 1) {
+      memberOr.push(
+        {
+          AND: [
+            { firstName: { contains: words[0] } },
+            { lastName: { contains: words.slice(1).join(" ") } },
+          ],
+        },
+        {
+          AND: [
+            { lastName: { contains: words[0] } },
+            { firstName: { contains: words.slice(1).join(" ") } },
+          ],
+        }
+      );
+    }
+    if (normQ && normQ !== q.toUpperCase()) {
+      memberOr.push({ cards: { some: { uid: { contains: normQ } } } });
+    }
+
+    const cardOr: any[] = [{ uid: { contains: q.toUpperCase() } }];
+    if (normQ && normQ !== q.toUpperCase()) {
+      cardOr.push({ uid: { contains: normQ } });
+    }
+
     const [members, cards, plans] = await Promise.all([
       prisma.member.findMany({
         where: {
           deletedAt: null,
-          OR: [
-            { firstName: { contains: q } },
-            { lastName: { contains: q } },
-            { phone: { contains: q } },
-            { email: { contains: q } },
-          ],
+          OR: memberOr,
         },
         select: {
           id: true,
@@ -44,7 +74,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.card.findMany({
         where: {
-          uid: { contains: q.toUpperCase() },
+          OR: cardOr,
         },
         include: {
           member: {

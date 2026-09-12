@@ -1,8 +1,17 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell, globalShortcut } = require("electron");
 const path = require("path");
 const http = require("http");
 const { spawn } = require("child_process");
 const os = require("os");
+const { uIOhook, UiohookKey } = require("uiohook-napi");
+
+// Hardware acceleration & GPU flags for buttery smooth 60fps on any device
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -14,9 +23,53 @@ let tray = null;
 let nextServerProcess = null;
 let isQuitting = false;
 
+// Global Background RFID Detection Map (0-9, A-F, Numpad0-9)
+const RFID_KEY_MAP = {
+  [UiohookKey["0"]]: "0",
+  [UiohookKey["1"]]: "1",
+  [UiohookKey["2"]]: "2",
+  [UiohookKey["3"]]: "3",
+  [UiohookKey["4"]]: "4",
+  [UiohookKey["5"]]: "5",
+  [UiohookKey["6"]]: "6",
+  [UiohookKey["7"]]: "7",
+  [UiohookKey["8"]]: "8",
+  [UiohookKey["9"]]: "9",
+  [UiohookKey.Numpad0]: "0",
+  [UiohookKey.Numpad1]: "1",
+  [UiohookKey.Numpad2]: "2",
+  [UiohookKey.Numpad3]: "3",
+  [UiohookKey.Numpad4]: "4",
+  [UiohookKey.Numpad5]: "5",
+  [UiohookKey.Numpad6]: "6",
+  [UiohookKey.Numpad7]: "7",
+  [UiohookKey.Numpad8]: "8",
+  [UiohookKey.Numpad9]: "9",
+  [UiohookKey.A]: "A",
+  [UiohookKey.B]: "B",
+  [UiohookKey.C]: "C",
+  [UiohookKey.D]: "D",
+  [UiohookKey.E]: "E",
+  [UiohookKey.F]: "F",
+};
+
+const ENTER_KEYS = new Set([UiohookKey.Enter, UiohookKey.NumpadEnter]);
+
+let rfidBuffer = "";
+let lastRfidKeyTime = 0;
+let isPopupActive = false;
+let popupHideTimer = null;
+let kioskWasFocusedBeforeScan = false;
+let kioskWasMinimizedBeforeScan = false;
+let mainWasFocusedBeforeScan = false;
+let isManagementMode = false;
+
 // 1. Single Instance Lock
+console.log("[PASSPro] Starting Electron main process...");
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
+console.log("[PASSPro] gotSingleInstanceLock:", gotSingleInstanceLock);
 if (!gotSingleInstanceLock) {
+  console.log("[PASSPro] Another instance is running, quitting...");
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -133,6 +186,13 @@ function createTray() {
       label: "Ouvrir l'Écran Borne Kiosque",
       click: () => openKioskWindow(),
     },
+    {
+      label: "⚡ Simuler Scan RFID (Pop-up dans 2s)",
+      click: () => {
+        console.log("[PASSPro] Tray triggered RFID simulation in 2s...");
+        setTimeout(() => triggerRfidPopup("04A32BF1"), 2000);
+      },
+    },
     { type: "separator" },
     {
       label: `Serveur local : En ligne (Port ${PORT})`,
@@ -181,11 +241,32 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: false,
     },
-    show: false,
+    show: true,
   });
 
-  // Track and broadcast maximize/unmaximize state to frontend
+  // Ensure window is shown and focused
+  mainWindow.once("ready-to-show", () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  mainWindow.webContents.once("did-finish-load", () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 1000);
   mainWindow.on("maximize", () => {
     if (mainWindow && mainWindow.webContents) {
       mainWindow.webContents.send("window-maximized-change", true);
@@ -262,8 +343,14 @@ function createMainWindow() {
     }, 1200);
   });
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
+
+  // Intercept window open calls to reuse kiosk window if opening /access
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.includes("/access") && !url.includes("/access-logs")) {
+      openKioskWindow();
+      return { action: "deny" };
+    }
+    return { action: "allow" };
   });
 
   // Intercept window close to minimize to System Tray instead of terminating RFID access
@@ -286,41 +373,280 @@ function createMainWindow() {
   });
 }
 
-// Open Dedicated Kiosk Window (on secondary monitor if available)
-function openKioskWindow(options = {}) {
-  if (kioskWindow) {
-    kioskWindow.show();
-    kioskWindow.focus();
-    return;
+// Locate any existing window that is currently displaying Borne d'accès (/access)
+function findKioskWindow() {
+  if (kioskWindow && !kioskWindow.isDestroyed()) {
+    try {
+      const url = kioskWindow.webContents.getURL();
+      if (url.includes("/access") && !url.includes("/access-logs")) {
+        return kioskWindow;
+      }
+    } catch (e) {}
   }
 
-  const displays = screen.getAllDisplays();
+  // Check all open browser windows across the app
+  const allWindows = BrowserWindow.getAllWindows();
+  for (const win of allWindows) {
+    if (!win.isDestroyed()) {
+      try {
+        const url = win.webContents.getURL();
+        if (url.includes("/access") && !url.includes("/access-logs")) {
+          kioskWindow = win;
+          return win;
+        }
+      } catch (e) {}
+    }
+  }
+
+  return null;
+}
+
+// Open Dedicated Kiosk Window (on secondary monitor if available or primary, reusing any existing window)
+function openKioskWindow(options = {}) {
+  const existing = findKioskWindow();
+  if (existing) {
+    if (!options.silent) {
+      if (existing.isMinimized()) existing.restore();
+      existing.maximize();
+      existing.show();
+      existing.focus();
+    }
+    return existing;
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
-  // Find external or secondary display if available
-  const secondaryDisplay = displays.find((d) => d.id !== primaryDisplay.id) || primaryDisplay;
+  const workArea = primaryDisplay.workArea;
 
   kioskWindow = new BrowserWindow({
-    x: secondaryDisplay.bounds.x,
-    y: secondaryDisplay.bounds.y,
-    width: secondaryDisplay.bounds.width,
-    height: secondaryDisplay.bounds.height,
-    fullscreen: true,
-    kiosk: true, // Lock into kiosk mode
+    x: workArea.x,
+    y: workArea.y,
+    width: workArea.width,
+    height: workArea.height,
+    minWidth: 900,
+    minHeight: 600,
+    fullscreen: false, // Normal window, NOT fullscreen (taskbar still appears)
+    frame: false,      // Frameless modern window with our bespoke designed top menu
     backgroundColor: "#000000",
-    title: "PASSPro - Borne d'Accès Kiosque",
+    title: "PASSPro - Borne d'Accès",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: false,
     },
+    show: false,
+  });
+
+  // Track maximize state for KioskTopBar
+  kioskWindow.on("maximize", () => {
+    if (kioskWindow && !kioskWindow.isDestroyed() && kioskWindow.webContents) {
+      kioskWindow.webContents.send("window-maximized-change", true);
+    }
+  });
+
+  kioskWindow.on("unmaximize", () => {
+    if (kioskWindow && !kioskWindow.isDestroyed() && kioskWindow.webContents) {
+      kioskWindow.webContents.send("window-maximized-change", false);
+    }
   });
 
   kioskWindow.loadURL(`${APP_URL}/access`);
 
+  if (!options.autoPopup) {
+    kioskWindow.once("ready-to-show", () => {
+      if (kioskWindow && !kioskWindow.isDestroyed()) {
+        kioskWindow.maximize();
+        kioskWindow.show();
+        kioskWindow.focus();
+      }
+    });
+  }
+
   kioskWindow.on("closed", () => {
     kioskWindow = null;
   });
+
+  return kioskWindow;
+}
+
+// Global RFID background keystroke processing
+function handleGlobalKey(e) {
+  const now = Date.now();
+  const timeDelta = now - lastRfidKeyTime;
+  lastRfidKeyTime = now;
+
+  // RFID readers send characters in ultra-fast bursts (< 65ms per key)
+  // If human typing or delay is > 65ms, clear the buffer
+  if (timeDelta > 65) {
+    rfidBuffer = "";
+  }
+
+  if (ENTER_KEYS.has(e.keycode)) {
+    if (rfidBuffer.length >= 4) {
+      const scannedUid = rfidBuffer;
+      rfidBuffer = "";
+      triggerRfidPopup(scannedUid);
+    }
+    rfidBuffer = "";
+  } else if (RFID_KEY_MAP[e.keycode]) {
+    rfidBuffer += RFID_KEY_MAP[e.keycode];
+  } else {
+    rfidBuffer = "";
+  }
+}
+
+// Request instant evaluation of RFID scan from local Next.js server
+function requestScanEvaluation(uid) {
+  return new Promise((resolve) => {
+    const postData = JSON.stringify({
+      uid,
+      source: "HARDWARE",
+      kioskName: "BORNE-01",
+    });
+
+    const req = http.request(
+      `http://127.0.0.1:${PORT}/api/access/scan`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(postData),
+          "x-internal-kiosk": "passpro-internal",
+        },
+        timeout: 3000,
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            resolve(null);
+          }
+        });
+      }
+    );
+
+    req.on("error", () => resolve(null));
+    req.write(postData);
+    req.end();
+  });
+}
+
+// Bring Borne d'Accès to the absolute foreground (Topmost Pop-up)
+async function triggerRfidPopup(scannedUid) {
+  console.log(`[PASSPro] Global RFID Card Detected: ${scannedUid}`);
+
+  // If the receptionist is currently in management mode (e.g. search bar or modal is focused),
+  // DO NOT popup the Kiosk window, and DO NOT record a turnstile access passage!
+  if (isManagementMode) {
+    console.log(`[PASSPro] RFID scan intercepted for Management/Search (UID: ${scannedUid}) - Kiosk popup suppressed.`);
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+      mainWindow.webContents.send("management-rfid-scan", { uid: scannedUid });
+    }
+    return;
+  }
+
+  // Capture exact focus and minimized state immediately at moment of scan BEFORE any async calls
+  const existingKiosk = findKioskWindow();
+  kioskWasFocusedBeforeScan = Boolean(existingKiosk && existingKiosk.isFocused());
+  kioskWasMinimizedBeforeScan = Boolean(existingKiosk && existingKiosk.isMinimized());
+  mainWasFocusedBeforeScan = Boolean(mainWindow && mainWindow.isFocused());
+
+  // 1. Immediately evaluate scan in background
+  const scanResult = await requestScanEvaluation(scannedUid);
+  console.log(`[PASSPro] Evaluated scan decision:`, scanResult ? scanResult.decision : "None");
+
+  // Note: Windows shell.beep() removed so the clean Web Audio RFID beep sounds in the kiosk screen
+
+  // 2. Reuse existing Borne d'Accès window or open one if none exists
+  let targetKiosk = existingKiosk;
+  if (!targetKiosk || targetKiosk.isDestroyed()) {
+    targetKiosk = openKioskWindow({ autoPopup: true });
+  }
+
+  if (targetKiosk && !targetKiosk.isDestroyed()) {
+    isPopupActive = true;
+
+    // Force Borne d'Accès window to absolute top (screen-saver level passes over fullscreen YouTube/games)
+    if (kioskWasFocusedBeforeScan) {
+      // If Borne d'Accès was ALREADY in focus before scan, keep focus on it
+      if (kioskWasMinimizedBeforeScan) targetKiosk.restore();
+      targetKiosk.setAlwaysOnTop(true, "screen-saver");
+      targetKiosk.show();
+      targetKiosk.focus();
+    } else {
+      // If user was in Google Chrome / external app / Dashboard:
+      // Pop up visually on top WITHOUT stealing keyboard focus from Google Chrome!
+      if (kioskWasMinimizedBeforeScan) {
+        targetKiosk.restore();
+      }
+      targetKiosk.setAlwaysOnTop(true, "screen-saver");
+      targetKiosk.showInactive();
+    }
+
+    const payload = { uid: scannedUid, result: scanResult };
+
+    const dispatchScan = () => {
+      if (targetKiosk && !targetKiosk.isDestroyed() && targetKiosk.webContents) {
+        targetKiosk.webContents.send("global-rfid-scan", payload);
+      }
+    };
+
+    if (targetKiosk.webContents.isLoading()) {
+      targetKiosk.webContents.once("did-finish-load", () => {
+        setTimeout(dispatchScan, 150);
+      });
+    } else {
+      dispatchScan();
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow !== targetKiosk && mainWindow.webContents) {
+      mainWindow.webContents.send("global-rfid-scan", payload);
+    }
+
+    // Safety fallback: release topmost after 2.2 seconds if not dismissed sooner by frontend
+    if (popupHideTimer) clearTimeout(popupHideTimer);
+    popupHideTimer = setTimeout(() => {
+      hideKioskPopup();
+    }, 2200);
+  }
+}
+
+// Release topmost after scan presentation without making the window disappear
+function hideKioskPopup() {
+  if (popupHideTimer) {
+    clearTimeout(popupHideTimer);
+    popupHideTimer = null;
+  }
+
+  // If this wasn't an automated background popup (e.g. user tested via simulation console inside the kiosk window),
+  // DO NOT alter focus at all! The window must remain directly in focus for continuous testing.
+  if (!isPopupActive) {
+    return;
+  }
+  isPopupActive = false;
+
+  const targetKiosk = findKioskWindow();
+  if (targetKiosk && !targetKiosk.isDestroyed()) {
+    targetKiosk.setAlwaysOnTop(false);
+
+    // 1. If Borne d'Accès was ALREADY in focus when scanned, IT STAYS IN FOCUS!
+    if (kioskWasFocusedBeforeScan) {
+      targetKiosk.focus();
+      return;
+    }
+
+    // 2. If it was NOT in focus before the scan:
+    // Minimize to taskbar to liberate Google Chrome / external app in the premier plan
+    targetKiosk.minimize();
+    if (mainWasFocusedBeforeScan && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }
 }
 
 // 2. Setup IPC Handlers
@@ -367,36 +693,74 @@ function setupIpcHandlers() {
   });
 
   // Window Controls
-  ipcMain.handle("is-maximized", () => {
-    return mainWindow ? mainWindow.isMaximized() : false;
+  ipcMain.handle("is-maximized", (event) => {
+    const win = (event && event.sender && BrowserWindow.fromWebContents(event.sender)) || mainWindow;
+    return win ? win.isMaximized() : false;
   });
 
-  ipcMain.handle("is-fullscreen", () => {
-    return mainWindow ? mainWindow.isFullScreen() : false;
+  ipcMain.handle("is-fullscreen", (event) => {
+    const win = (event && event.sender && BrowserWindow.fromWebContents(event.sender)) || mainWindow;
+    return win ? win.isFullScreen() : false;
   });
 
-  ipcMain.handle("toggle-fullscreen", () => {
-    if (mainWindow) {
-      const nextState = !mainWindow.isFullScreen();
-      mainWindow.setFullScreen(nextState);
+  ipcMain.handle("toggle-fullscreen", (event) => {
+    const win = (event && event.sender && BrowserWindow.fromWebContents(event.sender)) || mainWindow;
+    if (win) {
+      const nextState = !win.isFullScreen();
+      win.setFullScreen(nextState);
       return nextState;
     }
     return false;
   });
 
-  ipcMain.on("minimize-window", () => {
-    if (mainWindow) mainWindow.minimize();
-  });
-
-  ipcMain.on("maximize-window", () => {
-    if (mainWindow) {
-      if (mainWindow.isMaximized()) mainWindow.unmaximize();
-      else mainWindow.maximize();
+  ipcMain.on("minimize-window", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (win) {
+      if (win.isFullScreen()) {
+        win.setFullScreen(false);
+      }
+      win.minimize();
     }
   });
 
-  ipcMain.on("close-window", () => {
-    if (mainWindow) mainWindow.close();
+  ipcMain.on("maximize-window", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (win) {
+      if (win.isFullScreen()) {
+        win.setFullScreen(false);
+      }
+      if (win.isMaximized()) win.unmaximize();
+      else win.maximize();
+    }
+  });
+
+  ipcMain.on("close-window", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (win === mainWindow) {
+      isQuitting = true;
+      app.quit();
+    } else if (win) {
+      win.close();
+    }
+  });
+
+  // Hide Kiosk Popup after scan completes or on Escape
+  ipcMain.on("hide-kiosk-popup", () => {
+    hideKioskPopup();
+  });
+
+  // Set management mode (suppresses kiosk pop-up when typing or searching in dashboard)
+  ipcMain.on("set-management-mode", (event, active) => {
+    isManagementMode = Boolean(active);
+    console.log(`[PASSPro] Management mode set to: ${isManagementMode}`);
+  });
+
+  // Test RFID Popup simulation trigger (e.g. from TitleBar button)
+  ipcMain.on("test-rfid-popup", (event, { delaySeconds = 3 }) => {
+    console.log(`[PASSPro] Test RFID Popup scheduled in ${delaySeconds} seconds...`);
+    setTimeout(() => {
+      triggerRfidPopup("04A32BF1");
+    }, Math.max(0, delaySeconds * 1000));
   });
 
   // Server and LAN info
@@ -414,8 +778,29 @@ function setupIpcHandlers() {
 
 // 3. App Lifecycle
 app.whenReady().then(async () => {
+  console.log("[PASSPro] app.whenReady fired!");
   setupIpcHandlers();
   createTray();
+
+  // Start global keyboard hook for background RFID scanning
+  try {
+    uIOhook.on("keydown", handleGlobalKey);
+    uIOhook.start();
+    console.log("[PASSPro] Global RFID background hook activated.");
+  } catch (hookErr) {
+    console.warn("[PASSPro] Unable to start global keyboard hook:", hookErr.message);
+  }
+
+  // Register global shortcut Ctrl+Alt+S to simulate RFID scan from anywhere (even YouTube)
+  try {
+    globalShortcut.register("CommandOrControl+Alt+S", () => {
+      console.log("[PASSPro] Global Shortcut Ctrl+Alt+S triggered RFID Simulation");
+      triggerRfidPopup("04A32BF1");
+    });
+    console.log("[PASSPro] Shortcut Ctrl+Alt+S registered for RFID simulation test.");
+  } catch (err) {
+    console.warn("[PASSPro] Failed to register global shortcut:", err);
+  }
 
   if (app.isPackaged) {
     // In standalone packaged .exe mode, spawn production server
@@ -442,6 +827,12 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  try {
+    globalShortcut.unregisterAll();
+  } catch (err) {}
+  try {
+    uIOhook.stop();
+  } catch (err) {}
   if (nextServerProcess) {
     try {
       nextServerProcess.kill();

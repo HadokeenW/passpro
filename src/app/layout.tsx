@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/business/Toast";
 import { TitleBar } from "@/components/desktop/TitleBar";
+import { LanguageProvider } from "@/lib/i18n";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,12 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="antialiased font-sans min-h-screen bg-[#F6F8FB] text-[#0F172A] flex flex-col">
-        <TitleBar />
-        <div className="flex-1 flex flex-col min-h-0">
-          <ToastProvider>{children}</ToastProvider>
-        </div>
+        <LanguageProvider>
+          <TitleBar />
+          <div className="flex-1 flex flex-col min-h-0">
+            <ToastProvider>{children}</ToastProvider>
+          </div>
+        </LanguageProvider>
       </body>
     </html>
   );

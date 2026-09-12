@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { HeatmapBucket } from "@/server/services/dashboard";
+import { useTranslation } from "@/lib/i18n";
 
 interface HeatmapProps {
   buckets?: HeatmapBucket[];
@@ -8,9 +9,15 @@ interface HeatmapProps {
 }
 
 export const Heatmap: React.FC<HeatmapProps> = ({ buckets = [], className }) => {
+  const { language } = useTranslation();
   const [hovered, setHovered] = useState<HeatmapBucket | null>(null);
 
-  const dayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const dayLabels =
+    language === "ar"
+      ? ["إثن", "ثلا", "أرب", "خمي", "جمع", "سبت", "أحد"]
+      : language === "en"
+      ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      : ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const slotLabels = [
     "06–08", "08–10", "10–12", "12–14", "14–16", "16–18",
     "18–20", "20–22", "22–24", "00–02", "02–04", "04–06"
@@ -95,24 +102,30 @@ export const Heatmap: React.FC<HeatmapProps> = ({ buckets = [], className }) => 
         <div className="text-[#0F172A] font-medium h-5 flex items-center">
           {hovered ? (
             <span>
-              <strong className="font-semibold">{hovered.dayLabel}</strong> · {hovered.slotLabel} h ·{" "}
-              <span className="nums font-bold text-[#2563EB]">{hovered.count}</span> passage
-              {hovered.count > 1 ? "s" : ""}
+              <strong className="font-semibold">{dayLabels[hovered.dayIndex] || hovered.dayLabel}</strong> · {hovered.slotLabel} h ·{" "}
+              <span className="nums font-bold text-[#2563EB]">{hovered.count}</span>{" "}
+              {language === "ar" ? "دخول" : language === "en" ? "entries" : "passages"}
             </span>
           ) : (
-            <span className="text-[#94A3B8]">Survolez un créneau pour voir le détail</span>
+            <span className="text-[#94A3B8]">
+              {language === "ar"
+                ? "مرر فوق فترة لرؤية التفاصيل"
+                : language === "en"
+                ? "Hover a time slot for details"
+                : "Survolez un créneau pour voir le détail"}
+            </span>
           )}
         </div>
 
         {/* Legend */}
         <div className="flex items-center gap-1.5 text-[#64748B]">
-          <span className="text-[11px]">Moins</span>
+          <span className="text-[11px]">{language === "ar" ? "أقل" : language === "en" ? "Less" : "Moins"}</span>
           <div className="w-3.5 h-3.5 rounded-[3px] bg-[#F1F5F9]" />
           <div className="w-3.5 h-3.5 rounded-[3px] bg-[#DBEAFE]" />
           <div className="w-3.5 h-3.5 rounded-[3px] bg-[#93C5FD]" />
           <div className="w-3.5 h-3.5 rounded-[3px] bg-[#3B82F6]" />
           <div className="w-3.5 h-3.5 rounded-[3px] bg-[#1D4ED8]" />
-          <span className="text-[11px]">Plus</span>
+          <span className="text-[11px]">{language === "ar" ? "أكثر" : language === "en" ? "More" : "Plus"}</span>
         </div>
       </div>
     </div>

@@ -24,12 +24,16 @@ import {
   Trash2,
   X,
   User,
+  UserPlus,
   Shield,
   Clock,
   ArrowRight,
 } from "lucide-react";
 
 import { getCachedData, setCachedData, prewarmRoute, prewarmAllCoreRoutes } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
+import { LanguageSelector } from "@/components/desktop/LanguageSelector";
+import { MemberOnboardingWizardModal } from "@/components/business/MemberOnboardingWizardModal";
 
 const routePrewarmMap: Record<string, string[]> = {
   "/": ["/api/dashboard/metrics", "/api/dashboard/heatmap", "/api/dashboard/activity?limit=15"],
@@ -64,6 +68,7 @@ interface NavGroup {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t, isRTL, language } = useTranslation();
   const cachedMe = getCachedData<any>("/api/auth/me");
   const [user, setUser] = useState<UserInfo | null>(() => cachedMe?.user || null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -72,9 +77,57 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const prevPathRef = useRef(pathname);
 
+  const tLayout = {
+    logoutTitle: { fr: "Se déconnecter", en: "Sign out", ar: "تسجيل الخروج" },
+    searching: { fr: "Recherche en cours...", en: "Searching...", ar: "جاري البحث..." },
+    noResults: (q: string) => ({
+      fr: `Aucun résultat pour « ${q} »`,
+      en: `No results for "${q}"`,
+      ar: `لا توجد نتائج لـ « ${q} »`,
+    }),
+    searchHint: {
+      fr: "Essayez avec un nom, numéro de téléphone ou UID de carte",
+      en: "Try searching by name, phone number, or card UID",
+      ar: "جرب البحث بالاسم، رقم الهاتف أو معرّف البطاقة",
+    },
+    membersCount: (c: number) => ({
+      fr: `Adhérents (${c})`,
+      en: `Members (${c})`,
+      ar: `الأعضاء (${c})`,
+    }),
+    cardsCount: (c: number) => ({
+      fr: `Badges RFID (${c})`,
+      en: `RFID Badges (${c})`,
+      ar: `بطاقات RFID (${c})`,
+    }),
+    plansCount: (c: number) => ({
+      fr: `Formules (${c})`,
+      en: `Plans (${c})`,
+      ar: `الاشتراكات (${c})`,
+    }),
+    noPhone: { fr: "Sans téléphone", en: "No phone", ar: "بدون هاتف" },
+    badgePrefix: { fr: "Badge :", en: "Badge:", ar: "البطاقة:" },
+    active: { fr: "Actif", en: "Active", ar: "نشط" },
+    expired: { fr: "Expiré", en: "Expired", ar: "منتهي" },
+    viewAllResults: (q: string) => ({
+      fr: `Voir tous les résultats pour « ${q} »`,
+      en: `View all results for "${q}"`,
+      ar: `عرض جميع النتائج لـ « ${q} »`,
+    }),
+    markRead: { fr: "Marquer comme lu", en: "Mark as read", ar: "تحديد كمقروء" },
+    deleteNotif: { fr: "Supprimer cette notification", en: "Delete notification", ar: "حذف هذا الإشعار" },
+    roles: {
+      ADMIN: { fr: "Administrateur", en: "Admin", ar: "مدير النظام" },
+      MANAGER: { fr: "Manager", en: "Manager", ar: "مدير" },
+      RECEPTIONIST: { fr: "Réception", en: "Reception", ar: "استقبال" },
+      ACCESS_GUARD: { fr: "Agent d'accès", en: "Access Guard", ar: "حارس بوابة" },
+    },
+  };
+
   // Smooth route transition indicator
   useEffect(() => {
     setIsNavigating(false);
+    setIsSearchOpen(false);
   }, [pathname]);
 
   const handleNavigate = (href: string) => {
@@ -106,6 +159,98 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileContainerRef = useRef<HTMLDivElement>(null);
 
+  // Universal Express Onboarding Wizard State (F2 shortcut)
+  const [isOnboardWizardOpen, setIsOnboardWizardOpen] = useState(false);
+  const isOnboardWizardOpenRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const openOnboardWizard = () => {
+    searchInputRef.current?.blur();
+    setIsSearchOpen(false);
+    setIsOnboardWizardOpen(true);
+  };
+
+  useEffect(() => {
+    isOnboardWizardOpenRef.current = isOnboardWizardOpen;
+    if (isOnboardWizardOpen) {
+      searchInputRef.current?.blur();
+      setIsSearchOpen(false);
+    }
+  }, [isOnboardWizardOpen]);
+
+  // Global custom event so any page (like /members "+ Nouvel adhérent") can open the universal wizard
+  useEffect(() => {
+    const handleOpenOnboard = () => openOnboardWizard();
+    window.addEventListener("passpro:open-onboarding", handleOpenOnboard);
+    return () => window.removeEventListener("passpro:open-onboarding", handleOpenOnboard);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F2 shortcut to open onboarding modal
+      if (e.key === "F2") {
+        e.preventDefault();
+        openOnboardWizard();
+        return;
+      }
+
+      // / or Ctrl+K / Cmd+K shortcut to quickly focus the global search bar
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      const isInputActive =
+        targetTag === "INPUT" ||
+        targetTag === "TEXTAREA" ||
+        (e.target as HTMLElement)?.isContentEditable;
+
+      if (
+        (e.key === "/" && !isInputActive) ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Listen for RFID scans while in management mode to automatically navigate to member
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).electronAPI?.onManagementRfidScan) return;
+
+    const cleanup = (window as any).electronAPI.onManagementRfidScan(async (data: { uid: string }) => {
+      // CRITICAL: If the F2 onboarding modal or any dialog modal is open, DO NOT touch search or navigate!
+      if (
+        isOnboardWizardOpenRef.current ||
+        (typeof document !== "undefined" && document.querySelector('[role="dialog"]'))
+      ) {
+        return;
+      }
+
+      if (!data?.uid) return;
+      const cleanUid = data.uid.trim().toUpperCase();
+
+      try {
+        const res = await fetch(`/api/cards/${encodeURIComponent(cleanUid)}`);
+        if (res.ok) {
+          const cardData = await res.json();
+          if (cardData?.member && !cardData.member.deletedAt) {
+            setSearchQuery(`${cardData.member.firstName} ${cardData.member.lastName}`);
+            setIsSearchOpen(false);
+            searchInputRef.current?.blur();
+            router.push(`/members/${cardData.member.id}`);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Management RFID scan error:", err);
+      }
+    });
+
+    return () => cleanup?.();
+  }, [router]);
+
   // Fetch user info and unread notifications count
   const fetchUnreadCount = () => {
     fetch("/api/notifications?unread=true&pageSize=1")
@@ -128,7 +273,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           setUser(data.user);
           setCachedData("/api/auth/me", data);
           fetchUnreadCount();
-          setTimeout(() => prewarmAllCoreRoutes(), 300);
         }
       })
       .catch(() => router.push("/login"))
@@ -181,7 +325,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         .then((r) => r.json())
         .then((data) => {
           setSearchResults(data);
-          setIsSearchOpen(true);
+          if (typeof document !== "undefined" && document.activeElement === searchInputRef.current) {
+            setIsSearchOpen(true);
+          }
         })
         .catch(console.error)
         .finally(() => setIsSearching(false));
@@ -279,46 +425,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navGroups: NavGroup[] = [
     {
-      label: "Exploitation",
+      label: t("nav.exploitation"),
       items: [
-        { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-        { href: "/access", label: "Borne d'accès", icon: ScanLine, isExternal: true },
-        { href: "/access-logs", label: "Journal des passages", icon: History },
+        { href: "/", label: t("nav.dashboard"), icon: LayoutDashboard },
+        { href: "/access", label: t("nav.kiosk"), icon: ScanLine, isExternal: true },
+        { href: "/access-logs", label: t("nav.accessLogs"), icon: History },
       ],
     },
     {
-      label: "Gestion",
+      label: t("nav.management"),
       items: [
-        { href: "/members", label: "Adhérents", icon: Users },
-        { href: "/subscriptions", label: "Abonnements", icon: CalendarCheck },
-        { href: "/plans", label: "Formules", icon: Tags },
-        { href: "/cards", label: "Cartes RFID", icon: CreditCard },
+        { href: "/members", label: t("nav.members"), icon: Users },
+        { href: "/subscriptions", label: t("nav.subscriptions"), icon: CalendarCheck },
+        { href: "/plans", label: t("nav.plans"), icon: Tags },
+        { href: "/cards", label: t("nav.cards"), icon: CreditCard },
       ],
     },
     {
-      label: "Finances",
-      items: [{ href: "/payments", label: "Caisse", icon: Receipt }],
+      label: t("nav.finances"),
+      items: [{ href: "/payments", label: t("nav.payments"), icon: Receipt }],
     },
     ...(user?.role === "RECEPTIONIST"
       ? []
       : [
           {
-            label: "Système",
-            items: [{ href: "/settings", label: "Paramètres", icon: Settings }],
+            label: t("nav.system"),
+            items: [{ href: "/settings", label: t("nav.settings"), icon: Settings }],
           },
         ]),
   ];
 
   const getBreadcrumbs = () => {
-    if (pathname === "/") return "Exploitation / Tableau de bord";
-    if (pathname.startsWith("/members/")) return "Gestion / Adhérents / Dossier 360°";
-    if (pathname.startsWith("/members")) return "Gestion / Adhérents";
-    if (pathname.startsWith("/subscriptions")) return "Gestion / Abonnements";
-    if (pathname.startsWith("/plans")) return "Gestion / Formules tarifaires";
-    if (pathname.startsWith("/cards")) return "Gestion / Cartes RFID";
-    if (pathname.startsWith("/payments")) return "Finances / Caisse";
-    if (pathname.startsWith("/access-logs")) return "Exploitation / Journal des passages";
-    if (pathname.startsWith("/settings")) return "Système / Paramètres";
+    if (pathname === "/") return t("breadcrumbs.dashboard");
+    if (pathname.startsWith("/members/")) return t("breadcrumbs.memberDetail");
+    if (pathname.startsWith("/members")) return t("breadcrumbs.members");
+    if (pathname.startsWith("/subscriptions")) return t("breadcrumbs.subscriptions");
+    if (pathname.startsWith("/plans")) return t("breadcrumbs.plans");
+    if (pathname.startsWith("/cards")) return t("breadcrumbs.cards");
+    if (pathname.startsWith("/payments")) return t("breadcrumbs.payments");
+    if (pathname.startsWith("/access-logs")) return t("breadcrumbs.accessLogs");
+    if (pathname.startsWith("/settings")) return t("breadcrumbs.settings");
     return "PASSPro";
   };
 
@@ -369,6 +515,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
+        {/* Quick Action: Nouvel Adhérent (F2) */}
+        <div className="mb-3 px-1">
+          <button
+            onClick={openOnboardWizard}
+            className="w-full flex items-center justify-between gap-2 py-2 px-3 rounded-[12px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-[12.5px] shadow-sm shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-white" />
+              <span>{t("members.newMember") || "Nouvel adhérent"}</span>
+            </div>
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono text-white/90">
+              F2
+            </span>
+          </button>
+        </div>
+
         {/* Middle: Navigation Items */}
         <div className="flex-1 overflow-y-auto space-y-4 py-1 pr-1">
           {navGroups.map((group) => (
@@ -389,8 +551,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        target="_blank"
-                        onClick={() => setMobileMenuOpen(false)}
+                        target={item.href === "/access" ? undefined : "_blank"}
+                        onClick={(e) => {
+                          setMobileMenuOpen(false);
+                          if (item.href === "/access" && typeof window !== "undefined" && (window as any).electronAPI?.openKioskWindow) {
+                            e.preventDefault();
+                            (window as any).electronAPI.openKioskWindow();
+                          }
+                        }}
                         className="flex items-center justify-between px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-all group"
                       >
                         <div className="flex items-center gap-3">
@@ -440,11 +608,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="pt-3 border-t border-[#F1F5F9] shrink-0">
           <button
             onClick={handleLogout}
-            title="Se déconnecter"
+            title={tLayout.logoutTitle[language]}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[16px] text-[13.5px] font-medium text-[#94A3B8] hover:text-[#DC2626] hover:bg-[#FEF2F2]/60 transition-all group"
           >
             <LogOut className="w-4 h-4 text-[#94A3B8] group-hover:text-[#DC2626] transition-colors" />
-            <span>Déconnexion</span>
+            <span>{t("nav.logout")}</span>
           </button>
         </div>
       </aside>
@@ -465,41 +633,110 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* Inline Minimal Search */}
-            <div ref={searchContainerRef} className="relative flex-1 max-w-[340px]">
+            <div
+              ref={searchContainerRef}
+              onClick={() => {
+                searchInputRef.current?.focus();
+                if (searchQuery.trim()) {
+                  setIsSearchOpen(true);
+                }
+              }}
+              className="relative flex-1 max-w-[340px] cursor-text"
+            >
               <div className="flex items-center text-[#94A3B8] focus-within:text-[#0F172A] transition-colors">
-                <Search className="w-4 h-4 mr-2.5 shrink-0 text-[#94A3B8]" />
+                <Search className="w-4 h-4 mr-2.5 rtl:mr-0 rtl:ml-2.5 shrink-0 text-[#94A3B8]" />
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t("nav.searchPlaceholder")}
                   value={searchQuery}
                   onFocus={() => {
-                    if (searchQuery.trim().length > 0) setIsSearchOpen(true);
+                    if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+                      (window as any).electronAPI.setManagementMode(true);
+                    }
+                    if (searchQuery.trim()) {
+                      setIsSearchOpen(true);
+                    }
                   }}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchQuery.trim()) {
-                      setIsSearchOpen(false);
-                      if (searchResults?.members && searchResults.members.length > 0) {
-                        router.push(`/members/${searchResults.members[0].id}`);
-                      } else {
-                        router.push(`/members?q=${encodeURIComponent(searchQuery.trim())}`);
+                  onBlur={() => {
+                    setTimeout(() => {
+                      if (typeof window !== "undefined" && (window as any).electronAPI?.setManagementMode) {
+                        (window as any).electronAPI.setManagementMode(false);
                       }
-                    } else if (e.key === "Escape") {
+                    }, 250);
+                  }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchQuery(val);
+                    if (val.trim()) {
+                      setIsSearchOpen(true);
+                    } else {
                       setIsSearchOpen(false);
                     }
                   }}
-                  className="w-full bg-transparent text-[13.5px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
+                  onKeyDown={async (e) => {
+                    const q = (e.currentTarget.value || searchQuery).trim();
+                    if (e.key === "Enter" && q) {
+                      e.preventDefault();
+                      setIsSearchOpen(false);
+                      searchInputRef.current?.blur();
+
+                      // 1. If we already have live results, navigate to first member match
+                      if (searchResults?.members && searchResults.members.length > 0) {
+                        router.push(`/members/${searchResults.members[0].id}`);
+                        return;
+                      }
+                      if (searchResults?.cards && searchResults.cards.length > 0 && searchResults.cards[0].member) {
+                        router.push(`/members/${searchResults.cards[0].member.id}`);
+                        return;
+                      }
+
+                      // 2. Immediate query (for RFID card scan which submits Enter instantly)
+                      try {
+                        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+                        if (res.ok) {
+                          const data = await res.json();
+                          if (data?.members && data.members.length > 0) {
+                            router.push(`/members/${data.members[0].id}`);
+                            return;
+                          }
+                          if (data?.cards && data.cards.length > 0 && data.cards[0].member) {
+                            router.push(`/members/${data.cards[0].member.id}`);
+                            return;
+                          }
+                        }
+                      } catch (err) {
+                        console.error("Fast search on Enter error:", err);
+                      }
+
+                      // 3. Fallback: filter members page
+                      router.push(`/members?q=${encodeURIComponent(q)}`);
+                    } else if (e.key === "Escape") {
+                      setIsSearchOpen(false);
+                      searchInputRef.current?.blur();
+                    }
+                  }}
+                  className="w-full bg-transparent text-[13.5px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none pr-1 rtl:pr-0 rtl:pl-1 cursor-text"
                 />
-                {searchQuery && (
+
+                {/* Keyboard Shortcut Indicator / Clear Button */}
+                {searchQuery ? (
                   <button
                     onClick={() => {
                       setSearchQuery("");
                       setIsSearchOpen(false);
+                      searchInputRef.current?.focus();
                     }}
-                    className="text-[#94A3B8] hover:text-[#0F172A] p-0.5"
+                    className="text-[#94A3B8] hover:text-[#0F172A] p-0.5 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
+                ) : (
+                  <div className="flex items-center gap-1 shrink-0 select-none pointer-events-none">
+                    <kbd className="hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10.5px] font-mono font-medium text-[#94A3B8] bg-[#F1F5F9] border border-[#E2E8F0] rounded-[5px] shadow-2xs">
+                      /
+                    </kbd>
+                  </div>
                 )}
               </div>
 
@@ -508,15 +745,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="absolute top-9 left-0 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
                   {isSearching ? (
                     <div className="p-4 text-center text-[13px] text-[#64748B]">
-                      Recherche en cours...
+                      {tLayout.searching[language]}
                     </div>
                   ) : !hasSearchResults ? (
                     <div className="p-5 text-center">
                       <p className="text-[13px] font-medium text-[#0F172A]">
-                        Aucun résultat pour « {searchQuery} »
+                        {tLayout.noResults(searchQuery)[language]}
                       </p>
                       <p className="text-[11px] text-[#64748B] mt-0.5">
-                        Essayez avec un nom, numéro de téléphone ou UID de carte
+                        {tLayout.searchHint[language]}
                       </p>
                     </div>
                   ) : (
@@ -525,7 +762,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {searchResults.members.length > 0 && (
                         <div className="p-2">
                           <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                            Adhérents ({searchResults.members.length})
+                            {tLayout.membersCount(searchResults.members.length)[language]}
                           </div>
                           <div className="space-y-0.5">
                             {searchResults.members.map((m) => {
@@ -533,11 +770,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                               return (
                                 <button
                                   key={m.id}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setIsSearchOpen(false);
+                                    router.push(`/members/${m.id}`);
+                                  }}
                                   onClick={() => {
                                     setIsSearchOpen(false);
                                     router.push(`/members/${m.id}`);
                                   }}
-                                  className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                  className="w-full text-left rtl:text-right p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group cursor-pointer"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-7 h-7 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center font-bold text-[11px] shrink-0">
@@ -549,8 +791,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         {m.firstName} {m.lastName}
                                       </div>
                                       <div className="text-[11px] text-[#64748B] truncate">
-                                        {m.phone || "Sans téléphone"}
-                                        {m.cards?.[0] && ` · Badge: ${m.cards[0].uid}`}
+                                        {m.phone || tLayout.noPhone[language]}
+                                        {m.cards?.[0] && ` · ${tLayout.badgePrefix[language]} ${m.cards[0].uid}`}
                                       </div>
                                     </div>
                                   </div>
@@ -562,7 +804,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                           : "bg-[#FEF2F2] text-[#DC2626]"
                                       }`}
                                     >
-                                      {sub.status === "ACTIVE" ? "Actif" : "Expiré"}
+                                      {sub.status === "ACTIVE" ? tLayout.active[language] : tLayout.expired[language]}
                                     </span>
                                   )}
                                 </button>
@@ -576,12 +818,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {searchResults.cards.length > 0 && (
                         <div className="p-2">
                           <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                            Badges RFID ({searchResults.cards.length})
+                            {tLayout.cardsCount(searchResults.cards.length)[language]}
                           </div>
                           <div className="space-y-0.5">
                             {searchResults.cards.map((c) => (
                               <button
                                 key={c.uid}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setIsSearchOpen(false);
+                                  if (c.member?.id) {
+                                    router.push(`/members/${c.member.id}`);
+                                  } else {
+                                    router.push(`/cards?q=${encodeURIComponent(c.uid)}`);
+                                  }
+                                }}
                                 onClick={() => {
                                   setIsSearchOpen(false);
                                   if (c.member?.id) {
@@ -590,7 +841,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     router.push(`/cards?q=${encodeURIComponent(c.uid)}`);
                                   }
                                 }}
-                                className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                className="w-full text-left rtl:text-right p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group cursor-pointer"
                               >
                                 <div className="flex items-center gap-2">
                                   <CreditCard className="w-4 h-4 text-[#64748B]" />
@@ -612,7 +863,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                       : "bg-[#F1F5F9] text-[#64748B]"
                                   }`}
                                 >
-                                  {c.status}
+                                  {c.status === "ACTIVE" ? tLayout.active[language] : c.status}
                                 </span>
                               </button>
                             ))}
@@ -624,17 +875,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {searchResults.plans.length > 0 && (
                         <div className="p-2">
                           <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                            Formules ({searchResults.plans.length})
+                            {tLayout.plansCount(searchResults.plans.length)[language]}
                           </div>
                           <div className="space-y-0.5">
                             {searchResults.plans.map((p) => (
                               <button
                                 key={p.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setIsSearchOpen(false);
+                                  router.push("/plans");
+                                }}
                                 onClick={() => {
                                   setIsSearchOpen(false);
                                   router.push("/plans");
                                 }}
-                                className="w-full text-left p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group"
+                                className="w-full text-left rtl:text-right p-2 rounded-[10px] hover:bg-[#F8FAFC] flex items-center justify-between transition-colors group cursor-pointer"
                               >
                                 <div className="flex items-center gap-2">
                                   <Tags className="w-4 h-4 text-[#64748B]" />
@@ -657,14 +913,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {/* Footer quick link */}
                       <div className="p-2 bg-[#F8FAFC]">
                         <button
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setIsSearchOpen(false);
+                            router.push(`/members?q=${encodeURIComponent(searchQuery.trim())}`);
+                          }}
                           onClick={() => {
                             setIsSearchOpen(false);
                             router.push(`/members?q=${encodeURIComponent(searchQuery.trim())}`);
                           }}
-                          className="w-full py-1.5 px-2 text-center text-[12px] font-semibold text-[#2563EB] hover:underline flex items-center justify-center gap-1"
+                          className="w-full py-1.5 px-2 text-center text-[12px] font-semibold text-[#2563EB] hover:underline flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <span>Voir tous les résultats pour « {searchQuery} »</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          <span>{tLayout.viewAllResults(searchQuery)[language]}</span>
+                          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
                         </button>
                       </div>
                     </div>
@@ -674,8 +935,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Right: Notifications & Profile */}
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          {/* Right: Language, Notifications & Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+            {/* Language Selector */}
+            <LanguageSelector theme="light" variant="compact" />
+
             {/* Notification Bell with Dropdown Popover */}
             <div ref={notifContainerRef} className="relative">
               <button
@@ -686,7 +950,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     ? "bg-[#F1F5F9] text-[#0F172A]"
                     : "text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
                 )}
-                title="Notifications"
+                title={t("nav.notifications")}
               >
                 <BellRing className="w-4 h-4" />
                 {unreadCount > 0 && (
@@ -696,16 +960,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               {/* Popover Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 top-11 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
                   {/* Popover Header */}
                   <div className="p-3.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-[14px] font-bold text-[#0F172A]">
-                        Notifications
+                        {t("nav.notifications")}
                       </span>
                       {unreadCount > 0 && (
                         <span className="px-2 py-0.5 text-[11px] font-bold bg-[#EFF6FF] text-[#2563EB] rounded-full border border-[#DBEAFE]">
-                          {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
+                          {unreadCount}
                         </span>
                       )}
                     </div>
@@ -713,21 +977,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {unreadCount > 0 && (
                         <button
                           onClick={handleMarkAllRead}
-                          title="Tout marquer comme lu"
+                          title={t("nav.markAllRead")}
                           className="flex items-center gap-1 text-[11px] font-medium text-[#2563EB] hover:text-[#1D4ED8] hover:bg-white px-2 py-1 rounded transition-colors"
                         >
                           <CheckCheck className="w-3.5 h-3.5" />
-                          <span>Tout lire</span>
+                          <span>{t("nav.markAllRead")}</span>
                         </button>
                       )}
                       {notifications.length > 0 && (
                         <button
                           onClick={handleDeleteAllNotifs}
-                          title="Supprimer toutes les notifications"
+                          title={t("nav.deleteAll")}
                           className="flex items-center gap-1 text-[11px] font-medium text-[#DC2626] hover:text-[#B91C1C] hover:bg-white px-2 py-1 rounded transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>Effacer</span>
+                          <span>{t("nav.deleteAll")}</span>
                         </button>
                       )}
                     </div>
@@ -737,7 +1001,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F1F5F9]">
                     {isLoadingNotifs ? (
                       <div className="p-8 text-center text-[13px] text-[#64748B]">
-                        Chargement des alertes...
+                        {t("common.loading")}
                       </div>
                     ) : notifications.length === 0 ? (
                       <div className="p-8 text-center">
@@ -745,10 +1009,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           <BellRing className="w-5 h-5" />
                         </div>
                         <p className="text-[13px] font-semibold text-[#0F172A]">
-                          Aucune notification
-                        </p>
-                        <p className="text-[11px] text-[#64748B] mt-0.5">
-                          Toutes les alertes d'accès et d'abonnements sont traitées
+                          {t("nav.noNotifications")}
                         </p>
                       </div>
                     ) : (
@@ -821,7 +1082,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                               {!alert.read && (
                                 <button
                                   onClick={(e) => handleMarkAsRead(alert.id, e)}
-                                  title="Marquer comme lu"
+                                  title={tLayout.markRead[language]}
                                   className="w-6 h-6 rounded flex items-center justify-center text-[#64748B] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
                                 >
                                   <Check className="w-3.5 h-3.5" />
@@ -829,7 +1090,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                               )}
                               <button
                                 onClick={(e) => handleDeleteNotif(alert.id, e)}
-                                title="Supprimer cette notification"
+                                title={tLayout.deleteNotif[language]}
                                 className="w-6 h-6 rounded flex items-center justify-center text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -865,7 +1126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Profile Dropdown Menu */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-11 w-[240px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150 p-1.5">
+                  <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[240px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150 p-1.5">
                     {/* User Identity Header */}
                     <div className="p-3 bg-[#F8FAFC] rounded-[12px] mb-1">
                       <div className="text-[13px] font-bold text-[#0F172A] truncate">
@@ -876,13 +1137,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </div>
                       <div className="mt-2">
                         <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                          {user.role === "ADMIN"
-                            ? "Administrateur"
-                            : user.role === "MANAGER"
-                            ? "Responsable"
-                            : user.role === "RECEPTIONIST"
-                            ? "Réceptionniste"
-                            : user.role}
+                          {tLayout.roles[user.role as keyof typeof tLayout.roles]?.[language] || user.role}
                         </span>
                       </div>
                     </div>
@@ -891,12 +1146,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <div className="space-y-0.5 py-1">
                       <Link
                         href="/access"
-                        target="_blank"
-                        onClick={() => setIsProfileOpen(false)}
+                        target={typeof window !== "undefined" && (window as any).electronAPI?.openKioskWindow ? undefined : "_blank"}
+                        onClick={(e) => {
+                          setIsProfileOpen(false);
+                          if (typeof window !== "undefined" && (window as any).electronAPI?.openKioskWindow) {
+                            e.preventDefault();
+                            (window as any).electronAPI.openKioskWindow();
+                          }
+                        }}
                         className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#475569] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
                       >
                         <ScanLine className="w-4 h-4 text-[#64748B]" />
-                        <span>Borne d'accès</span>
+                        <span>{t("nav.kiosk")}</span>
                       </Link>
                       {user.role !== "RECEPTIONIST" && (
                         <Link
@@ -905,7 +1166,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#475569] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
                         >
                           <Settings className="w-4 h-4 text-[#64748B]" />
-                          <span>Paramètres</span>
+                          <span>{t("nav.settings")}</span>
                         </Link>
                       )}
                     </div>
@@ -918,10 +1179,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         setIsProfileOpen(false);
                         handleLogout();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#DC2626] hover:bg-[#FEF2F2] transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#DC2626] hover:bg-[#FEF2F2] transition-colors text-left rtl:text-right"
                     >
                       <LogOut className="w-4 h-4 text-[#DC2626]" />
-                      <span>Se déconnecter</span>
+                      <span>{t("nav.logout")}</span>
                     </button>
                   </div>
                 )}
@@ -937,6 +1198,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* Universal F2 Onboarding Wizard Modal */}
+      <MemberOnboardingWizardModal
+        isOpen={isOnboardWizardOpen}
+        onClose={() => setIsOnboardWizardOpen(false)}
+        onSuccess={() => {
+          routePrewarmMap[pathname]?.forEach((url) => prewarmRoute(url));
+        }}
+      />
     </div>
   );
 }

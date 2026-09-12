@@ -126,7 +126,7 @@ export async function getDashboardMetrics() {
     planBreakdown,
   };
 
-  cachedMetrics = { data: result, expiresAt: now.getTime() + 5000 };
+  cachedMetrics = { data: result, expiresAt: now.getTime() + 15000 };
   return result;
 }
 
@@ -205,7 +205,7 @@ export async function getHeatmapData(days: number = 28) {
     daysCovered: days,
   };
 
-  cachedHeatmap = { data: result, expiresAt: nowMs + 15000 };
+  cachedHeatmap = { data: result, expiresAt: nowMs + 60000 };
   return result;
 }
 

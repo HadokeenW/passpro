@@ -17,6 +17,7 @@ import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 import {
   CreditCard,
   RefreshCw,
@@ -27,8 +28,6 @@ import {
   Printer,
   Ban,
   ShieldCheck,
-  Check,
-  X,
   ArrowLeft,
   Camera,
 } from "lucide-react";
@@ -58,6 +57,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const router = useRouter();
   const toast = useToast();
+  const { t, language } = useTranslation();
 
   const [dossier, setDossier] = useState<MemberDossier | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,13 +72,162 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any | null>(null);
 
+  const tLabels = {
+    loading: { fr: "Chargement du dossier adhérent...", en: "Loading member dossier...", ar: "جاري تحميل ملف المشترك..." },
+    changePhotoTooltip: { fr: "Cliquer pour changer la photo", en: "Click to change photo", ar: "اضغط لتغيير الصورة" },
+    dueNotice: { fr: "⚠️ Reste à payer :", en: "⚠️ Balance due:", ar: "⚠️ المتبقي للدفع:" },
+    phonePrefix: { fr: "Tél :", en: "Phone:", ar: "الهاتف:" },
+    emailPrefix: { fr: "Email :", en: "Email:", ar: "البريد:" },
+    registeredPrefix: { fr: "Inscrit le", en: "Registered on", ar: "مسجل بتاريخ" },
+    photoBtn: { fr: "Photo", en: "Photo", ar: "صورة" },
+    settleDebtBtn: (amt: string) => ({
+      fr: `Régler la dette (${amt})`,
+      en: `Settle debt (${amt})`,
+      ar: `تسديد الدين (${amt})`,
+    }),
+    renewBtn: { fr: "Renouveler", en: "Renew", ar: "تجديد" },
+    activeSubCardTitle: { fr: "Abonnement en cours", en: "Current Subscription", ar: "الاشتراك الحالي" },
+    sessionsPlanBadge: { fr: "🎟️ Formule par séances", en: "🎟️ Session-based plan", ar: "🎟️ اشتراك بالحصص" },
+    timeSlotPlanBadge: { fr: "🕒 Formule heure exacte", en: "🕒 Time-slot plan", ar: "🕒 اشتراك فترة محددة" },
+    planRate: { fr: "Tarif formule :", en: "Plan price:", ar: "سعر الاشتراك:" },
+    daysSuffix: { fr: "jours", en: "days", ar: "أيام" },
+    allowedHours: { fr: "Horaires autorisés :", en: "Allowed hours:", ar: "الأوقات المسموحة:" },
+    toWord: { fr: "à", en: "to", ar: "إلى" },
+    creditGrantedDue: { fr: "Crédit accordé — Reste à payer :", en: "Credit granted — Balance due:", ar: "تسهيل دفع — المبلغ المتبقي:" },
+    totalSub: { fr: "Total souscription :", en: "Total subscription:", ar: "إجمالي الاشتراك:" },
+    alreadyPaid: { fr: "Déjà réglé :", en: "Already paid:", ar: "المسدد مسبقاً:" },
+    settleBalanceBtn: (amt: string) => ({
+      fr: `Régler le solde (${amt})`,
+      en: `Settle balance (${amt})`,
+      ar: `تسديد الرصيد (${amt})`,
+    }),
+    availSessions: { fr: "Séances disponibles :", en: "Available sessions:", ar: "الحصص المتاحة:" },
+    sessionsDeductNote: {
+      fr: "Décompté automatiquement d'1 séance à chaque passage au contrôle d'accès.",
+      en: "Automatically deducts 1 session on each access control scan.",
+      ar: "يتم خصم حصة واحدة تلقائياً عند كل دخول عند البوابة.",
+    },
+    noActiveSub: {
+      fr: "Cet adhérent ne possède aucun abonnement actif actuellement.",
+      en: "This member currently has no active subscription.",
+      ar: "لا يمتلك هذا المشترك أي اشتراك نشط حالياً.",
+    },
+    subscribePlanBtn: { fr: "Souscrire une formule", en: "Subscribe a plan", ar: "إصدار اشتراك" },
+    lastPassagesTitle: { fr: "Derniers passages à la borne", en: "Recent terminal entries", ar: "آخر عمليات الدخول عند البوابة" },
+    passagesCount: (c: number) => ({
+      fr: `${c} passage(s) au total`,
+      en: `${c} total passage(s)`,
+      ar: `${c} إجمالي عمليات الدخول`,
+    }),
+    noPassages: {
+      fr: "Aucun passage enregistré pour cet adhérent",
+      en: "No entry recorded for this member",
+      ar: "لا يوجد أي دخول مسجل لهذا المشترك",
+    },
+    colDateTime: { fr: "Date & Heure", en: "Date & Time", ar: "التاريخ والوقت" },
+    colKiosk: { fr: "Borne", en: "Terminal", ar: "البوابة" },
+    colReason: { fr: "Motif", en: "Reason", ar: "السبب" },
+    colDecision: { fr: "Décision", en: "Decision", ar: "القرار" },
+    paymentsHistoryTitle: { fr: "Historique des règlements", en: "Payment history", ar: "سجل المدفوعات" },
+    totalSpentPrefix: { fr: "Total réglé :", en: "Total paid:", ar: "إجمالي المسدد:" },
+    noPayments: { fr: "Aucun règlement enregistré", en: "No payments recorded", ar: "لا توجد مدفوعات مسجلة" },
+    colReceiptNo: { fr: "N° Reçu", en: "Receipt #", ar: "رقم الوصل" },
+    colDate: { fr: "Date", en: "Date", ar: "التاريخ" },
+    colPlan: { fr: "Formule", en: "Plan", ar: "الاشتراك" },
+    colAmount: { fr: "Montant", en: "Amount", ar: "المبلغ" },
+    colReceipt: { fr: "Reçu", en: "Receipt", ar: "الوصل" },
+    reprintTooltip: { fr: "Voir / Réimprimer le reçu", en: "View / Reprint receipt", ar: "عرض / إعادة طباعة الوصل" },
+    rfidCardCardTitle: { fr: "Badge RFID associé", en: "Associated RFID Badge", ar: "بطاقة RFID المرتبطة" },
+    replaceCardBtn: { fr: "Remplacer le badge", en: "Replace card", ar: "استبدال البطاقة" },
+    unblockCardBtn: { fr: "Débloquer le badge", en: "Unblock card", ar: "إلغاء حظر البطاقة" },
+    blockCardBtn: { fr: "Bloquer le badge", en: "Block card", ar: "حظر البطاقة" },
+    noCardAssigned: {
+      fr: "Aucun badge RFID n'est actuellement assigné à cet adhérent.",
+      en: "No RFID badge is currently assigned to this member.",
+      ar: "لا توجد بطاقة RFID معينة لهذا المشترك حالياً.",
+    },
+    assignCardBtn: { fr: "Attribuer un badge", en: "Assign badge", ar: "تعيين بطاقة" },
+    notesCardTitle: { fr: "Notes internes", en: "Internal notes", ar: "ملاحظات داخلية" },
+    notesPlaceholder: {
+      fr: "Saisissez des notes sur l'adhérent (sauvegarde automatique au clic hors du champ)...",
+      en: "Enter notes about member (auto-saves on blur)...",
+      ar: "أدخل ملاحظات حول المشترك (حفظ تلقائي عند النقر خارج الحقل)...",
+    },
+    notesConfidentialNote: {
+      fr: "Ces notes sont strictement confidentielles et ne figurent jamais sur les reçus.",
+      en: "These notes are strictly confidential and never appear on receipts.",
+      ar: "هذه الملاحظات سرية للغاية ولا تظهر أبداً على الإيصالات.",
+    },
+    dangerTitle: { fr: "Suppression du dossier", en: "Dossier archiving", ar: "أرشفة الملف" },
+    dangerDesc: {
+      fr: "L'adhérent sera désactivé des listes. Tous les reçus et logs d'accès restent conservés pour l'audit.",
+      en: "Member will be deactivated from lists. All receipts and access logs are preserved for audit.",
+      ar: "سيتم إلغاء تفعيل المشترك من القوائم. يتم الاحتفاظ بجميع الإيصالات وسجلات الدخول لأغراض الرقابة.",
+    },
+    archiveMemberBtn: { fr: "Archiver l'adhérent", en: "Archive member", ar: "أرشفة المشترك" },
+    deleteModalTitle: { fr: "Confirmer l'archivage", en: "Confirm archiving", ar: "تأكيد الأرشفة" },
+    deleteModalDesc: {
+      fr: "Cette action désactivera l'adhérent du club.",
+      en: "This action will deactivate the member from the club.",
+      ar: "سيؤدي هذا الإجراء إلى إلغاء تفعيل المشترك في النادي.",
+    },
+    deleteModalBody: (n: string) => ({
+      fr: `Êtes-vous certain de vouloir archiver le dossier de ${n} ? Son badge ne sera plus reconnu au contrôle d'accès.`,
+      en: `Are you sure you want to archive the dossier of ${n}? Their card will no longer be recognized at access control.`,
+      ar: `هل أنت متأكد من رغبتك في أرشفة ملف ${n}؟ لن يتم التعرف على بطاقته عند نقطة الدخول.`,
+    }),
+    cancelBtn: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
+    errorTitle: { fr: "Erreur", en: "Error", ar: "خطأ" },
+    archiveErrorTitle: { fr: "Erreur d'archivage", en: "Archiving error", ar: "خطأ في الأرشفة" },
+    archiveErrorDesc: {
+      fr: "Impossible d'archiver cet adhérent",
+      en: "Unable to archive this member",
+      ar: "تعذر أرشفة هذا العضو",
+    },
+    networkErrorTitle: { fr: "Erreur réseau", en: "Network error", ar: "خطأ في الشبكة" },
+    networkErrorDesc: {
+      fr: "Impossible de contacter le serveur",
+      en: "Unable to reach server",
+      ar: "تعذر الاتصال بالخادم",
+    },
+    photoErrorDesc: {
+      fr: "Impossible d'enregistrer la photo",
+      en: "Unable to save photo",
+      ar: "تعذر حفظ الصورة الشخصية",
+    },
+  };
+
+  const translateReason = (reason: string) => {
+    const map: Record<string, { fr: string; en: string; ar: string }> = {
+      CARD_NOT_FOUND: { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      CARD_BLOCKED: { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      CARD_UNASSIGNED: { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      NO_ACTIVE_SUBSCRIPTION: { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      SUBSCRIPTION_EXPIRED: { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      SUBSCRIPTION_SUSPENDED: { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      SESSIONS_EXHAUSTED: { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      OUTSIDE_TIME_WINDOW: { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      OK: { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+      "Badge non reconnu": { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      "Badge bloqué": { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      "Badge non assigné": { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      "Aucun abonnement actif": { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      "Abonnement expiré": { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      "Abonnement suspendu": { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      "Séances épuisées (0 restante)": { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      "Hors créneau horaire autorisé": { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      "Accès autorisé": { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+    };
+    return map[reason]?.[language] || reason;
+  };
+
   const fetchDossier = () => {
     setIsLoading(true);
     fetch(`/api/members/${id}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
-          toast.error("Erreur", data.error.message);
+          toast.error(tLabels.errorTitle[language], data.error.message);
           router.push("/members");
         } else {
           setDossier(data);
@@ -102,7 +251,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({ notes: internalNotes }),
       });
       invalidateCache(["/api/members", "/api/dashboard"]);
-      toast.success("Notes sauvegardées", "Les modifications sont enregistrées");
+      toast.success(
+        language === "ar" ? "تم حفظ الملاحظات" : language === "en" ? "Notes saved" : "Notes sauvegardées",
+        language === "ar" ? "تم تسجيل التعديلات" : language === "en" ? "Changes recorded" : "Les modifications sont enregistrées"
+      );
     } catch (err) {
       console.error(err);
     }
@@ -119,8 +271,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok) {
         invalidateCache(["/api/cards", "/api/members", "/api/dashboard"]);
         toast.success(
-          action === "BLOCK" ? "Badge bloqué" : "Badge débloqué",
-          `Le badge ${cardUid} est désormais ${action === "BLOCK" ? "bloqué" : "actif"}`
+          action === "BLOCK"
+            ? language === "ar" ? "تم حظر البطاقة" : language === "en" ? "Card blocked" : "Badge bloqué"
+            : language === "ar" ? "تم إلغاء حظر البطاقة" : language === "en" ? "Card unblocked" : "Badge débloqué",
+          cardUid
         );
         fetchDossier();
       }
@@ -138,8 +292,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok) {
         invalidateCache(["/api/subscriptions", "/api/members", "/api/dashboard"]);
         toast.success(
-          isSuspended ? "Abonnement réactivé" : "Abonnement suspendu",
-          `Le statut a été mis à jour`
+          isSuspended
+            ? language === "ar" ? "تمت إعادة تفعيل الاشتراك" : language === "en" ? "Subscription reactivated" : "Abonnement réactivé"
+            : language === "ar" ? "تم إيقاف الاشتراك مؤقتاً" : language === "en" ? "Subscription suspended" : "Abonnement suspendu",
+          dossier ? `${dossier.member.firstName} ${dossier.member.lastName}` : ""
         );
         fetchDossier();
       }
@@ -153,16 +309,19 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       const res = await fetch(`/api/members/${id}`, { method: "DELETE" });
       if (res.ok) {
         invalidateCache(["/api/members", "/api/dashboard", "/api/subscriptions", "/api/cards"]);
-        toast.success("Adhérent archivé", "Le dossier a été archivé");
+        toast.success(
+          language === "ar" ? "تمت أرشفة المشترك" : language === "en" ? "Member archived" : "Adhérent archivé",
+          dossier ? `${dossier.member.firstName} ${dossier.member.lastName}` : ""
+        );
         setIsDeleteModalOpen(false);
         router.push("/members");
       } else {
         const d = await res.json();
-        toast.error("Erreur d'archivage", d.error?.message || "Impossible d'archiver cet adhérent");
+        toast.error(tLabels.archiveErrorTitle[language], d.error?.message || tLabels.archiveErrorDesc[language]);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erreur réseau", "Impossible de contacter le serveur");
+      toast.error(tLabels.networkErrorTitle[language], tLabels.networkErrorDesc[language]);
     }
   };
 
@@ -175,15 +334,18 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       });
       if (res.ok) {
         invalidateCache(["/api/members", "/api/dashboard"]);
-        toast.success("Photo mise à jour", "La photo d'identité est enregistrée");
+        toast.success(
+          language === "ar" ? "تم تحديث الصورة" : language === "en" ? "Photo updated" : "Photo mise à jour",
+          language === "ar" ? "تم تسجيل الصورة الشخصية بنجاح" : language === "en" ? "ID photo saved" : "La photo d'identité est enregistrée"
+        );
         fetchDossier();
       } else {
         const d = await res.json();
-        toast.error("Erreur", d.error?.message || "Impossible d'enregistrer la photo");
+        toast.error(tLabels.errorTitle[language], d.error?.message || tLabels.photoErrorDesc[language]);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erreur réseau", "Impossible de joindre le serveur");
+      toast.error(tLabels.networkErrorTitle[language], tLabels.networkErrorDesc[language]);
     }
   };
 
@@ -202,7 +364,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   if (isLoading || !dossier) {
     return (
       <div className="h-96 flex items-center justify-center text-[#64748B] text-[14px]">
-        Chargement du dossier adhérent...
+        {tLabels.loading[language]}
       </div>
     );
   }
@@ -217,10 +379,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       <div>
         <button
           onClick={() => router.push("/members")}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#64748B] hover:text-[#0F172A] transition-colors"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Retour aux adhérents</span>
+          <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+          <span>{t("common.back")} · {t("members.title")}</span>
         </button>
       </div>
 
@@ -232,7 +394,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             <div
               onClick={() => setIsPhotoModalOpen(true)}
               className="relative group cursor-pointer shrink-0"
-              title="Cliquer pour changer la photo"
+              title={tLabels.changePhotoTooltip[language]}
             >
               {member.photoUrl ? (
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#2563EB] shadow-sm bg-black">
@@ -268,13 +430,13 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                 />
                 {currentSubscription?.balanceDue > 0 && (
                   <span className="px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
-                    ⚠️ Reste à payer : {formatMoney(currentSubscription.balanceDue)}
+                    {tLabels.dueNotice[language]} {formatMoney(currentSubscription.balanceDue)}
                   </span>
                 )}
               </div>
               <p className="text-[13px] text-[#64748B] mt-1">
-                Tél : <span className="font-medium text-[#0F172A]">{member.phone || "—"}</span> · Email :{" "}
-                <span className="font-medium text-[#0F172A]">{member.email || "—"}</span> · Inscrit le{" "}
+                {tLabels.phonePrefix[language]} <span className="font-medium text-[#0F172A]">{member.phone || "—"}</span> · {tLabels.emailPrefix[language]}{" "}
+                <span className="font-medium text-[#0F172A]">{member.email || "—"}</span> · {tLabels.registeredPrefix[language]}{" "}
                 {formatDate(member.createdAt)}
               </p>
             </div>
@@ -288,7 +450,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               leftIcon={<Camera className="w-3.5 h-3.5" />}
               onClick={() => setIsPhotoModalOpen(true)}
             >
-              Photo
+              {tLabels.photoBtn[language]}
             </Button>
 
             <Button
@@ -297,7 +459,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               leftIcon={<Edit2 className="w-3.5 h-3.5" />}
               onClick={() => setIsEditModalOpen(true)}
             >
-              Modifier
+              {t("common.edit")}
             </Button>
 
             {currentSubscription?.balanceDue > 0 && (
@@ -309,7 +471,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   setIsPaymentModalOpen(true);
                 }}
               >
-                Régler la dette ({formatMoney(currentSubscription.balanceDue)})
+                {tLabels.settleDebtBtn(formatMoney(currentSubscription.balanceDue))[language]}
               </Button>
             )}
 
@@ -331,7 +493,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   )
                 }
               >
-                {currentSubscription.storedStatus === "SUSPENDED" ? "Réactiver" : "Suspendre"}
+                {currentSubscription.storedStatus === "SUSPENDED" ? t("subscriptions.actions.reactivate") : t("subscriptions.actions.suspend")}
               </Button>
             )}
 
@@ -344,7 +506,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                 setIsPaymentModalOpen(true);
               }}
             >
-              Renouveler
+              {tLabels.renewBtn[language]}
             </Button>
           </div>
         </div>
@@ -355,7 +517,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         {/* Main Column (2fr) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Card: Abonnement en cours */}
-          <Card title="Abonnement en cours">
+          <Card title={tLabels.activeSubCardTitle[language]}>
             {currentSubscription ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -366,19 +528,19 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       </h3>
                       {currentSubscription.planType === "SESSIONS" && (
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                          🎟️ Formule par séances
+                          {tLabels.sessionsPlanBadge[language]}
                         </span>
                       )}
                       {currentSubscription.planType === "TIME_SLOT" && (
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
-                          🕒 Formule heure exacte
+                          {tLabels.timeSlotPlanBadge[language]}
                         </span>
                       )}
                     </div>
                     <div className="text-[13px] text-[#64748B] mt-0.5">
-                      Tarif formule : {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · {currentSubscription.durationDays} jours
+                      {tLabels.planRate[language]} {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · {currentSubscription.durationDays} {tLabels.daysSuffix[language]}
                       {currentSubscription.planType === "TIME_SLOT" && currentSubscription.startTime && currentSubscription.endTime && (
-                        <span> · Horaires autorisés : <strong className="text-[#0F172A]">{currentSubscription.startTime} à {currentSubscription.endTime}</strong></span>
+                        <span> · {tLabels.allowedHours[language]} <strong className="text-[#0F172A]">{currentSubscription.startTime} {tLabels.toWord[language]} {currentSubscription.endTime}</strong></span>
                       )}
                     </div>
                   </div>
@@ -392,10 +554,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       <span className="text-[20px]">⚠️</span>
                       <div>
                         <div className="text-[13px] font-bold text-[#991B1B]">
-                          Crédit accordé — Reste à payer : {formatMoney(currentSubscription.balanceDue)}
+                          {tLabels.creditGrantedDue[language]} {formatMoney(currentSubscription.balanceDue)}
                         </div>
                         <div className="text-[11px] text-[#B91C1C]">
-                          Total souscription : {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · Déjà réglé : {formatMoney(currentSubscription.paidAmount || 0)}
+                          {tLabels.totalSub[language]} {formatMoney(currentSubscription.price || currentSubscription.planPrice)} · {tLabels.alreadyPaid[language]} {formatMoney(currentSubscription.paidAmount || 0)}
                         </div>
                       </div>
                     </div>
@@ -407,7 +569,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                         setIsPaymentModalOpen(true);
                       }}
                     >
-                      Régler le solde ({formatMoney(currentSubscription.balanceDue)})
+                      {tLabels.settleBalanceBtn(formatMoney(currentSubscription.balanceDue))[language]}
                     </Button>
                   </div>
                 )}
@@ -416,7 +578,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                 {currentSubscription.planType === "SESSIONS" && (
                   <div className="p-3.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[8px]">
                     <div className="flex justify-between items-center text-[13px] mb-1.5 font-semibold text-[#1E40AF]">
-                      <span>Séances disponibles :</span>
+                      <span>{tLabels.availSessions[language]}</span>
                       <span className="nums text-[15px] font-bold">
                         {currentSubscription.remainingSessions ?? 0} / {currentSubscription.totalSessions ?? 10}
                       </span>
@@ -438,7 +600,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       />
                     </div>
                     <p className="text-[11px] text-[#3B82F6] mt-1.5">
-                      Décompté automatiquement d'1 séance à chaque passage au contrôle d'accès.
+                      {tLabels.sessionsDeductNote[language]}
                     </p>
                   </div>
                 )}
@@ -452,7 +614,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             ) : (
               <div className="text-center py-6">
                 <p className="text-[13px] text-[#64748B]">
-                  Cet adhérent ne possède aucun abonnement actif actuellement.
+                  {tLabels.noActiveSub[language]}
                 </p>
                 <Button
                   variant="primary"
@@ -460,7 +622,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   className="mt-3"
                   onClick={() => setIsPaymentModalOpen(true)}
                 >
-                  Souscrire une formule
+                  {tLabels.subscribePlanBtn[language]}
                 </Button>
               </div>
             )}
@@ -468,22 +630,22 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
 
           {/* Card: Derniers passages */}
           <Card
-            title="Derniers passages à la borne"
-            subtitle={`${stats.totalPassages} passage(s) au total`}
+            title={tLabels.lastPassagesTitle[language]}
+            subtitle={tLabels.passagesCount(stats.totalPassages)[language]}
             noPadding
           >
             {recentAccessLogs.length === 0 ? (
               <div className="p-6 text-center text-[#64748B] text-[13px]">
-                Aucun passage enregistré pour cet adhérent
+                {tLabels.noPassages[language]}
               </div>
             ) : (
               <table className="w-full text-left text-[13px] border-collapse">
                 <thead>
                   <tr className="h-9 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B]">
-                    <th className="px-5">Date & Heure</th>
-                    <th className="px-4">Borne</th>
-                    <th className="px-4">Motif</th>
-                    <th className="px-5 text-right">Décision</th>
+                    <th className="px-5">{tLabels.colDateTime[language]}</th>
+                    <th className="px-4">{tLabels.colKiosk[language]}</th>
+                    <th className="px-4">{tLabels.colReason[language]}</th>
+                    <th className="px-5 text-right">{tLabels.colDecision[language]}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
@@ -493,7 +655,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                         {formatDateTime(log.createdAt)}
                       </td>
                       <td className="px-4 text-[#64748B]">{log.kioskName}</td>
-                      <td className="px-4 text-[#64748B]">{log.reason}</td>
+                      <td className="px-4 text-[#64748B]">{translateReason(log.reason)}</td>
                       <td className="px-5 text-right">
                         <StatusPill status={log.decision} />
                       </td>
@@ -506,23 +668,23 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
 
           {/* Card: Règlements & Reçus */}
           <Card
-            title="Historique des règlements"
-            subtitle={`Total réglé : ${formatMoney(stats.totalSpent)}`}
+            title={tLabels.paymentsHistoryTitle[language]}
+            subtitle={`${tLabels.totalSpentPrefix[language]} ${formatMoney(stats.totalSpent)}`}
             noPadding
           >
             {recentPayments.length === 0 ? (
               <div className="p-6 text-center text-[#64748B] text-[13px]">
-                Aucun règlement enregistré
+                {tLabels.noPayments[language]}
               </div>
             ) : (
               <table className="w-full text-left text-[13px] border-collapse">
                 <thead>
                   <tr className="h-9 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B]">
-                    <th className="px-5">N° Reçu</th>
-                    <th className="px-4">Date</th>
-                    <th className="px-4">Formule</th>
-                    <th className="px-4 text-right">Montant</th>
-                    <th className="px-5 text-right">Reçu</th>
+                    <th className="px-5">{tLabels.colReceiptNo[language]}</th>
+                    <th className="px-4">{tLabels.colDate[language]}</th>
+                    <th className="px-4">{tLabels.colPlan[language]}</th>
+                    <th className="px-4 text-right">{tLabels.colAmount[language]}</th>
+                    <th className="px-5 text-right">{tLabels.colReceipt[language]}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
@@ -539,8 +701,8 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       <td className="px-5 text-right">
                         <button
                           onClick={() => handleReprint(p.id)}
-                          title="Voir / Réimprimer le reçu"
-                          className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-[#EFF6FF] text-[#2563EB] transition-colors"
+                          title={tLabels.reprintTooltip[language]}
+                          className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-[#EFF6FF] text-[#2563EB] transition-colors cursor-pointer"
                         >
                           <Printer className="w-3.5 h-3.5" />
                         </button>
@@ -556,7 +718,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         {/* Side Column (1fr) */}
         <div className="space-y-6">
           {/* Card: Badge RFID Virtuel */}
-          <Card title="Badge RFID associé">
+          <Card title={tLabels.rfidCardCardTitle[language]}>
             <div className="flex flex-col items-center">
               {currentCard ? (
                 <>
@@ -575,7 +737,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       leftIcon={<CreditCard className="w-4 h-4" />}
                       onClick={() => setIsCardModalOpen(true)}
                     >
-                      Remplacer le badge
+                      {tLabels.replaceCardBtn[language]}
                     </Button>
 
                     <Button
@@ -585,7 +747,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       leftIcon={currentCard.status === "BLOCKED" ? <ShieldCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                       onClick={() => handleToggleCardBlock(currentCard.uid, currentCard.status)}
                     >
-                      {currentCard.status === "BLOCKED" ? "Débloquer le badge" : "Bloquer le badge"}
+                      {currentCard.status === "BLOCKED" ? tLabels.unblockCardBtn[language] : tLabels.blockCardBtn[language]}
                     </Button>
                   </div>
                 </>
@@ -595,7 +757,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                     <CreditCard className="w-6 h-6" />
                   </div>
                   <p className="text-[13px] text-[#64748B] mb-4">
-                    Aucun badge RFID n'est actuellement assigné à cet adhérent.
+                    {tLabels.noCardAssigned[language]}
                   </p>
                   <Button
                     variant="primary"
@@ -603,7 +765,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                     className="w-full"
                     onClick={() => setIsCardModalOpen(true)}
                   >
-                    Attribuer un badge
+                    {tLabels.assignCardBtn[language]}
                   </Button>
                 </div>
               )}
@@ -611,27 +773,27 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
           </Card>
 
           {/* Card: Notes internes */}
-          <Card title="Notes internes">
+          <Card title={tLabels.notesCardTitle[language]}>
             <textarea
               value={internalNotes}
               onChange={(e) => setInternalNotes(e.target.value)}
               onBlur={handleNotesBlur}
-              placeholder="Saisissez des notes sur l'adhérent (sauvegarde automatique au clic hors du champ)..."
+              placeholder={tLabels.notesPlaceholder[language]}
               rows={4}
               className="w-full p-3 text-[13px] bg-[#F8FAFC] text-[#0F172A] border border-[#E2E8F0] rounded-[6px] focus:border-[#2563EB] focus:bg-white transition-colors"
             />
             <p className="text-[11px] text-[#94A3B8] mt-1.5">
-              Ces notes sont strictement confidentielles et ne figurent jamais sur les reçus.
+              {tLabels.notesConfidentialNote[language]}
             </p>
           </Card>
 
           {/* Danger Zone: Soft delete */}
           <div className="p-5 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2]/50">
             <h4 className="text-[13px] font-semibold text-[#DC2626] mb-1">
-              Suppression du dossier
+              {tLabels.dangerTitle[language]}
             </h4>
             <p className="text-[12px] text-[#64748B] mb-3">
-              L'adhérent sera désactivé des listes. Tous les reçus et logs d'accès restent conservés pour l'audit.
+              {tLabels.dangerDesc[language]}
             </p>
             <Button
               variant="danger-soft"
@@ -639,7 +801,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               leftIcon={<Trash2 className="w-3.5 h-3.5" />}
               onClick={() => setIsDeleteModalOpen(true)}
             >
-              Archiver l'adhérent
+              {tLabels.archiveMemberBtn[language]}
             </Button>
           </div>
         </div>
@@ -702,25 +864,21 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirmer l'archivage"
-        description="Cette action désactivera l'adhérent du club."
+        title={tLabels.deleteModalTitle[language]}
+        description={tLabels.deleteModalDesc[language]}
         footer={
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
-              Annuler
+              {tLabels.cancelBtn[language]}
             </Button>
             <Button variant="danger" onClick={handleDeleteMember}>
-              Confirmer l'archivage
+              {tLabels.deleteModalTitle[language]}
             </Button>
           </div>
         }
       >
         <p className="text-[13px] text-[#475569]">
-          Êtes-vous certain de vouloir archiver le dossier de{" "}
-          <strong>
-            {member.firstName} {member.lastName}
-          </strong>{" "}
-          ? Son badge ne sera plus reconnu au contrôle d'accès.
+          {tLabels.deleteModalBody(`${member.firstName} ${member.lastName}`)[language]}
         </p>
       </Modal>
     </div>

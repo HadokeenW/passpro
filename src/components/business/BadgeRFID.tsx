@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./StatusPill";
+import { useTranslation } from "@/lib/i18n";
 
 interface BadgeRFIDProps {
   memberName: string;
@@ -15,7 +16,14 @@ export const BadgeRFID: React.FC<BadgeRFIDProps> = ({
   status,
   className,
 }) => {
+  const { language } = useTranslation();
   const isBlocked = status === "BLOCKED";
+
+  const stockLabel =
+    language === "ar" ? "بطاقة في المخزون" : language === "en" ? "CARD IN STOCK" : "CARTE EN STOCK";
+  const blockedLabel =
+    language === "ar" ? "بطاقة محظورة" : language === "en" ? "CARD BLOCKED" : "CARTE BLOQUÉE";
+
 
   return (
     <div
@@ -51,7 +59,7 @@ export const BadgeRFID: React.FC<BadgeRFIDProps> = ({
           PASSPro Card
         </div>
         <div className="text-[16px] font-semibold text-white tracking-wide mt-1 truncate max-w-[210px]">
-          {memberName || "CARTE EN STOCK"}
+          {memberName || stockLabel}
         </div>
       </div>
 
@@ -83,7 +91,7 @@ export const BadgeRFID: React.FC<BadgeRFIDProps> = ({
       {isBlocked && (
         <div className="absolute inset-0 z-20 bg-white/70 backdrop-blur-[1px] flex items-center justify-center">
           <div className="w-full bg-[#DC2626] text-white py-1.5 px-4 text-center font-bold text-[13px] tracking-[0.15em] shadow-md transform -rotate-6 uppercase">
-            CARTE BLOQUÉE
+            {blockedLabel}
           </div>
         </div>
       )}

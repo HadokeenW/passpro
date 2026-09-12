@@ -7,11 +7,13 @@ import { PlanModal } from "@/components/business/PlanModal";
 import { Modal } from "@/components/business/Modal";
 import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
-import { Tags, Plus, Edit2, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Edit2, Trash2 } from "lucide-react";
 import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function PlansPage() {
   const toast = useToast();
+  const { t, language } = useTranslation();
   const cachedPlans = getCachedData<any[]>("/api/plans?includeInactive=true");
   const [plans, setPlans] = useState<any[]>(() => cachedPlans || []);
   const [isLoading, setIsLoading] = useState(() => !cachedPlans);
@@ -70,6 +72,45 @@ export default function PlansPage() {
     return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, []);
 
+  const tLabels = {
+    deactivatedToast: { fr: "Formule désactivée", en: "Plan deactivated", ar: "تم تعطيل الاشتراك" },
+    activatedToast: { fr: "Formule activée", en: "Plan activated", ar: "تم تفعيل الاشتراك" },
+    deletedToast: { fr: "Formule supprimée", en: "Plan deleted", ar: "تم حذف الاشتراك" },
+    noDesc: { fr: "Aucune description renseignée.", en: "No description provided.", ar: "لا يوجد وصف مدخل." },
+    maxValidity: (days: number, sessions: number) => ({
+      fr: `Validité max : ${days} j (${sessions} ${t("plans.sessionsCount")})`,
+      en: `Max validity: ${days} d (${sessions} ${t("plans.sessionsCount")})`,
+      ar: `أقصى صلاحية: ${days} يوم (${sessions} ${t("plans.sessionsCount")})`,
+    }),
+    slotValidity: (days: number, s: string, e: string) => ({
+      fr: `Validité : ${days} j (${s} à ${e})`,
+      en: `Validity: ${days} d (${s} to ${e})`,
+      ar: `الصلاحية: ${days} يوم (${s} إلى ${e})`,
+    }),
+    duration: (days: number) => ({
+      fr: `Durée : ${days} ${t("plans.daysCount")}`,
+      en: `Duration: ${days} ${t("plans.daysCount")}`,
+      ar: `المدة: ${days} ${t("plans.daysCount")}`,
+    }),
+    subscribedCount: (c: number) => ({
+      fr: `${c} souscrit${c > 1 ? "s" : ""}`,
+      en: `${c} subscribed`,
+      ar: `${c} مشترك`,
+    }),
+    deleteModalDesc: { fr: "Cette action est irréversible.", en: "This action is irreversible.", ar: "هذا الإجراء لا يمكن التراجع عنه." },
+    deleteModalBody: (name: string) => ({
+      fr: `Êtes-vous certain de vouloir supprimer définitivement la formule ${name} ? Si des abonnements y sont associés, la suppression sera refusée et vous devrez la désactiver à la place.`,
+      en: `Are you sure you want to permanently delete plan ${name}? If subscriptions are linked, deletion will be rejected and you must deactivate it instead.`,
+      ar: `هل أنت متأكد من رغبتك في حذف نوع الاشتراك ${name} نهائياً؟ إذا كانت هناك اشتراكات مرتبطة به، فسيتم رفض الحذف ويمكنك تعطيله بدلاً من ذلك.`,
+    }),
+    errTitle: { fr: "Erreur", en: "Error", ar: "خطأ" },
+    errModifyDesc: { fr: "Impossible de modifier la formule", en: "Unable to update plan", ar: "تعذر تعديل الاشتراك" },
+    errNetworkTitle: { fr: "Erreur réseau", en: "Network error", ar: "خطأ في الشبكة" },
+    errNetworkDesc: { fr: "Impossible de contacter le serveur", en: "Unable to contact server", ar: "تعذر الاتصال بالخادم" },
+    errDeleteRefused: { fr: "Suppression refusée", en: "Deletion refused", ar: "تم رفض الحذف" },
+    errDeleteDesc: { fr: "Impossible de supprimer", en: "Unable to delete", ar: "تعذر الحذف" },
+  };
+
   const handleToggleActive = async (plan: any) => {
     try {
       const res = await fetch(`/api/plans/${plan.id}`, {
@@ -80,17 +121,17 @@ export default function PlansPage() {
       if (res.ok) {
         invalidateCache(["/api/plans", "/api/dashboard"]);
         toast.success(
-          plan.active ? "Formule désactivée" : "Formule activée",
-          `La formule ${plan.name} est maintenant ${plan.active ? "masquée à la vente" : "disponible à la vente"}`
+          plan.active ? tLabels.deactivatedToast[language] : tLabels.activatedToast[language],
+          plan.name
         );
         fetchPlans();
       } else {
         const d = await res.json();
-        toast.error("Erreur", d.error?.message || "Impossible de modifier la formule");
+        toast.error(tLabels.errTitle[language], d.error?.message || tLabels.errModifyDesc[language]);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erreur réseau", "Impossible de contacter le serveur");
+      toast.error(tLabels.errNetworkTitle[language], tLabels.errNetworkDesc[language]);
     }
   };
 
@@ -100,10 +141,10 @@ export default function PlansPage() {
       const res = await fetch(`/api/plans/${planToDelete.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
-        toast.error("Suppression refusée", data.error?.message || "Impossible de supprimer");
+        toast.error(tLabels.errDeleteRefused[language], data.error?.message || tLabels.errDeleteDesc[language]);
       } else {
         invalidateCache(["/api/plans", "/api/dashboard"]);
-        toast.success("Formule supprimée", `La formule a été retirée`);
+        toast.success(tLabels.deletedToast[language], planToDelete.name);
         fetchPlans();
       }
     } catch (err) {
@@ -119,10 +160,10 @@ export default function PlansPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Formules tarifaires
+            {t("plans.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Paramétrez l'offre d'abonnements, les tarifs et les durées d'accès
+            {t("plans.subtitle")}
           </p>
         </div>
         {canManagePlans && (
@@ -134,7 +175,7 @@ export default function PlansPage() {
               setIsModalOpen(true);
             }}
           >
-            Créer une formule
+            {t("plans.createPlan")}
           </Button>
         )}
       </div>
@@ -155,15 +196,15 @@ export default function PlansPage() {
                         setSelectedPlan(p);
                         setIsModalOpen(true);
                       }}
-                      title="Modifier"
-                      className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
+                      title={t("plans.actions.edit")}
+                      className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setPlanToDelete(p)}
-                      title="Supprimer"
-                      className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+                      title={t("plans.actions.delete")}
+                      className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -178,7 +219,7 @@ export default function PlansPage() {
                     <div className="flex items-center gap-1.5">
                       {p.planType === "SESSIONS" && (
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                          🎟️ {p.sessionCount || 10} séances
+                          🎟️ {p.sessionCount || 10} {t("plans.sessionsCount")}
                         </span>
                       )}
                       {p.planType === "TIME_SLOT" && (
@@ -193,13 +234,13 @@ export default function PlansPage() {
                             : "bg-[#F1F5F9] text-[#64748B]"
                         }`}
                       >
-                        {p.active ? "Disponible" : "Désactivée"}
+                        {p.active ? t("plans.statusActive") : t("plans.statusHidden")}
                       </span>
                     </div>
                   </div>
 
                   <p className="text-[12px] text-[#64748B] line-clamp-2">
-                    {p.description || "Aucune description renseignée."}
+                    {p.description || tLabels.noDesc[language]}
                   </p>
                 </div>
 
@@ -207,10 +248,10 @@ export default function PlansPage() {
                   <div>
                     <div className="text-[11px] font-medium text-[#64748B]">
                       {p.planType === "SESSIONS"
-                        ? `Validité max : ${p.durationDays} j (${p.sessionCount || 10} séances)`
+                        ? tLabels.maxValidity(p.durationDays, p.sessionCount || 10)[language]
                         : p.planType === "TIME_SLOT"
-                        ? `Validité : ${p.durationDays} j (${p.startTime || "13:00"} à ${p.endTime || "16:00"})`
-                        : `Durée : ${p.durationDays} jour${p.durationDays > 1 ? "s" : ""}`}
+                        ? tLabels.slotValidity(p.durationDays, p.startTime || "13:00", p.endTime || "16:00")[language]
+                        : tLabels.duration(p.durationDays)[language]}
                     </div>
                     <div className="text-[20px] font-bold text-[#2563EB] nums mt-0.5">
                       {formatMoney(p.price)}
@@ -219,7 +260,7 @@ export default function PlansPage() {
 
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-[#64748B] nums">
-                      {subCount} souscrit{subCount > 1 ? "s" : ""}
+                      {tLabels.subscribedCount(subCount)[language]}
                     </span>
                     {canManagePlans && (
                       <Button
@@ -227,7 +268,7 @@ export default function PlansPage() {
                         size="sm"
                         onClick={() => handleToggleActive(p)}
                       >
-                        {p.active ? "Désactiver" : "Activer"}
+                        {p.active ? t("plans.actions.deactivate") : t("plans.actions.activate")}
                       </Button>
                     )}
                   </div>
@@ -250,23 +291,21 @@ export default function PlansPage() {
       <Modal
         isOpen={!!planToDelete}
         onClose={() => setPlanToDelete(null)}
-        title="Supprimer la formule"
-        description="Cette action est irréversible."
+        title={t("plans.actions.delete")}
+        description={tLabels.deleteModalDesc[language]}
         footer={
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => setPlanToDelete(null)}>
-              Annuler
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" onClick={handleDelete}>
-              Supprimer
+              {t("plans.actions.delete")}
             </Button>
           </div>
         }
       >
         <p className="text-[13px] text-[#475569]">
-          Êtes-vous certain de vouloir supprimer définitivement la formule{" "}
-          <strong>{planToDelete?.name}</strong> ? Si des abonnements y sont associés,
-          la suppression sera refusée et vous devrez la désactiver à la place.
+          {planToDelete && tLabels.deleteModalBody(planToDelete.name)[language]}
         </p>
       </Modal>
     </div>

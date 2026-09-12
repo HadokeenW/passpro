@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 export interface ChartSlice {
   label: string;
@@ -20,10 +21,22 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
   planData = [],
   className,
 }) => {
+  const { t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<"plans" | "status">("plans");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const currentData = activeTab === "plans" ? planData : statusData;
+  const translateStatusLabel = (lbl: string) => {
+    if (lbl === "Actif" || lbl === "ACTIVE") return t("common.active");
+    if (lbl === "Expiré" || lbl === "EXPIRED") return t("dashboard.expired");
+    if (lbl === "Suspendu" || lbl === "SUSPENDED") return language === "ar" ? "موقوف" : language === "en" ? "Suspended" : "Suspendu";
+    return lbl;
+  };
+
+  const rawData = activeTab === "plans" ? planData : statusData;
+  const currentData = rawData.map((item) => ({
+    ...item,
+    label: activeTab === "status" ? translateStatusLabel(item.label) : item.label,
+  }));
   const total = currentData.reduce((acc, item) => acc + item.count, 0);
 
   // SVG Donut geometry
@@ -56,7 +69,7 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
       {/* View Switcher Pill */}
       <div className="flex items-center justify-between pb-2 border-b border-[#F1F5F9]">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-          Répartition
+          {language === "ar" ? "التوزيع" : language === "en" ? "Breakdown" : "Répartition"}
         </span>
         <div className="inline-flex bg-[#F1F5F9] p-0.5 rounded-[12px]">
           <button
@@ -71,7 +84,7 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
                 : "text-[#64748B] hover:text-[#0F172A]"
             )}
           >
-            Formules
+            {t("nav.plans")}
           </button>
           <button
             onClick={() => {
@@ -85,7 +98,7 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
                 : "text-[#64748B] hover:text-[#0F172A]"
             )}
           >
-            Statuts
+            {t("common.status")}
           </button>
         </div>
       </div>
@@ -152,13 +165,15 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
           ) : (
             <>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                Total
+                {language === "ar" ? "المجموع" : "Total"}
               </span>
               <span className="text-[26px] font-black text-[#0F172A] leading-tight nums">
                 {total}
               </span>
               <span className="text-[11px] font-medium text-[#64748B]">
-                {activeTab === "plans" ? "adhésions" : "abonnés"}
+                {activeTab === "plans"
+                  ? language === "ar" ? "اشتراك" : language === "en" ? "plans" : "adhésions"
+                  : language === "ar" ? "مشترك" : language === "en" ? "members" : "abonnés"}
               </span>
             </>
           )}
@@ -169,7 +184,7 @@ export const DistributionDonutChart: React.FC<DistributionDonutChartProps> = ({
       <div className="space-y-1 pt-1 max-h-[140px] overflow-y-auto">
         {segments.length === 0 ? (
           <div className="text-center text-[12px] text-[#94A3B8] py-2">
-            Aucune donnée disponible
+            {language === "ar" ? "لا توجد بيانات متاحة" : language === "en" ? "No data available" : "Aucune donnée disponible"}
           </div>
         ) : (
           segments.map((seg) => {

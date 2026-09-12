@@ -11,30 +11,32 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10)));
 
-    const unreadCount = await prisma.alert.count({ where: { read: false } });
-
     const where: any = {};
     if (unreadOnly) {
       where.read = false;
     }
 
-    const total = await prisma.alert.count({ where });
-
-    const alerts = await prisma.alert.findMany({
-      where,
-      include: {
-        member: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+    const [unreadCount, totalCount, alerts] = await Promise.all([
+      prisma.alert.count({ where: { read: false } }),
+      unreadOnly ? Promise.resolve(null) : prisma.alert.count({ where }),
+      prisma.alert.findMany({
+        where,
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const total = unreadOnly ? unreadCount : (totalCount as number);
 
     return NextResponse.json({
       items: alerts,

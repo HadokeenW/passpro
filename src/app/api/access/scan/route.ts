@@ -7,7 +7,11 @@ import { AccessSource } from "@prisma/client";
 export async function POST(req: NextRequest) {
   try {
     // Accessible by all authenticated roles (ADMIN, MANAGER, RECEPTIONIST, ACCESS_GUARD)
-    await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST", "ACCESS_GUARD"]);
+    // or by internal kiosk caller
+    const isInternalKiosk = req.headers.get("x-internal-kiosk") === "passpro-internal";
+    if (!isInternalKiosk) {
+      await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST", "ACCESS_GUARD"]);
+    }
     const body = await req.json();
     const { uid, source = "SIMULATION", kioskName } = body;
 

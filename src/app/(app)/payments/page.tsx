@@ -20,14 +20,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
-  CreditCard,
   Download,
   ClipboardCheck,
 } from "lucide-react";
 
 import { getCachedData, setCachedData } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function PaymentsPage() {
+  const { t, language } = useTranslation();
   const initialCacheKey = "/api/payments?page=1&pageSize=15&period=today";
   const initialData = getCachedData<any>(initialCacheKey);
 
@@ -103,16 +104,29 @@ export default function PaymentsPage() {
   };
 
   const periodOptions = [
-    { label: "Aujourd'hui", value: "today" },
-    { label: "Semaine", value: "week" },
-    { label: "Mois", value: "month" },
-    { label: "Tout", value: "all" },
+    { label: t("payments.periods.today"), value: "today" },
+    { label: t("payments.periods.week"), value: "week" },
+    { label: t("payments.periods.month"), value: "month" },
+    { label: t("payments.periods.all"), value: "all" },
   ];
 
   const methodLabels: Record<string, string> = {
-    CASH: "Espèces",
-    CARD: "Carte bancaire",
-    OTHER: "Autre",
+    CASH: t("payments.methods.CASH"),
+    CARD: t("payments.methods.CARD"),
+    OTHER: t("payments.methods.OTHER"),
+  };
+
+  const tLabels = {
+    kpiPeriodPrefix: { fr: "Période :", en: "Period:", ar: "الفترة:" },
+    kpiTransTitle: { fr: "Transactions enregistrées", en: "Processed Transactions", ar: "العمليات المسجلة" },
+    kpiTransCtx: { fr: "Nombre de reçus émis", en: "Issued receipts count", ar: "عدد الإيصالات الصادرة" },
+    totalLabel: { fr: "Total :", en: "Total:", ar: "الإجمالي:" },
+    systemOperator: { fr: "Système", en: "System", ar: "النظام" },
+    csvHeaders: {
+      fr: ["Numéro Reçu", "Date & Heure", "Adhérent", "Téléphone", "Formule", "Mode de règlement", "Montant (DA)", "Opérateur"],
+      en: ["Receipt Number", "Date & Time", "Member", "Phone", "Plan", "Payment Method", "Amount (DZD)", "Operator"],
+      ar: ["رقم الوصل", "التاريخ والوقت", "المشترك", "الهاتف", "الاشتراك", "وسيلة الدفع", "المبلغ (دج)", "المستخدم"],
+    },
   };
 
   const handleExportCsv = async () => {
@@ -120,25 +134,16 @@ export default function PaymentsPage() {
       const res = await fetch(`/api/payments?period=${period}&pageSize=1000`);
       const data = await res.json();
       const items = data.items || payments;
-      const headers = [
-        "Numéro Reçu",
-        "Date & Heure",
-        "Adhérent",
-        "Téléphone",
-        "Formule",
-        "Mode de règlement",
-        "Montant (DA)",
-        "Opérateur",
-      ];
+      const headers = tLabels.csvHeaders[language];
       const rows = items.map((p: any) => [
         p.receiptNumber,
         formatDateTime(p.createdAt),
         `${p.member?.firstName || ""} ${p.member?.lastName || ""}`.trim(),
         p.member?.phone || "",
-        p.subscription?.plan?.name || "Abonnement",
+        p.subscription?.plan?.name || (language === "ar" ? "اشتراك" : "Abonnement"),
         methodLabels[p.method] || p.method,
         p.amount,
-        p.operator?.name || "",
+        p.operator?.name || tLabels.systemOperator[language],
       ]);
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")}`;
@@ -154,10 +159,10 @@ export default function PaymentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Journal de caisse & Encaissements
+            {t("payments.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Historique des règlements, réimpression des tickets thermiques 80 mm
+            {t("payments.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
@@ -166,7 +171,7 @@ export default function PaymentsPage() {
             leftIcon={<Download className="w-4 h-4" />}
             onClick={handleExportCsv}
           >
-            Exporter CSV
+            {t("payments.exportCsv")}
           </Button>
 
           <Button
@@ -174,7 +179,7 @@ export default function PaymentsPage() {
             leftIcon={<ClipboardCheck className="w-4 h-4 text-[#2563EB]" />}
             onClick={() => setIsDailyReportOpen(true)}
           >
-            Clôture du jour (Rapport Z)
+            {t("payments.closeZReport")}
           </Button>
 
           <Button
@@ -182,7 +187,7 @@ export default function PaymentsPage() {
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={() => setIsPaymentModalOpen(true)}
           >
-            Nouvel encaissement
+            {t("payments.newPayment")}
           </Button>
         </div>
       </div>
@@ -190,15 +195,15 @@ export default function PaymentsPage() {
       {/* 2. Summary KPI Cards for the period */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <KpiCard
-          label="Total encaissé sur la période"
+          label={t("payments.kpiTotal")}
           value={formatMoney(summary.totalAmount)}
-          context={`Période sélectionnée : ${periodOptions.find((p) => p.value === period)?.label}`}
+          context={`${tLabels.kpiPeriodPrefix[language]} ${periodOptions.find((p) => p.value === period)?.label}`}
           icon={<Coins className="w-5 h-5" />}
         />
         <KpiCard
-          label="Transactions enregistrées"
+          label={tLabels.kpiTransTitle[language]}
           value={summary.count}
-          context="Nombre de reçus émis"
+          context={tLabels.kpiTransCtx[language]}
           icon={<Receipt className="w-5 h-5" />}
         />
       </div>
@@ -214,7 +219,7 @@ export default function PaymentsPage() {
           }}
         />
         <div className="text-[13px] text-[#64748B]">
-          Total : <span className="font-semibold text-[#0F172A] nums">{total}</span> règlements
+          {tLabels.totalLabel[language]} <span className="font-semibold text-[#0F172A] nums">{total}</span>
         </div>
       </div>
 
@@ -222,16 +227,16 @@ export default function PaymentsPage() {
       <Card noPadding>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-[#64748B] text-[14px]">
-            Chargement des règlements...
+            {t("payments.loading")}
           </div>
         ) : payments.length === 0 ? (
           <EmptyState
             icon={<Receipt className="w-8 h-8" />}
-            title="Aucun règlement sur cette période"
-            description="Effectuez un encaissement pour voir apparaître le reçu ici."
+            title={t("payments.emptyTitle")}
+            description={t("payments.emptyDesc")}
             action={
               <Button variant="primary" onClick={() => setIsPaymentModalOpen(true)}>
-                Encaisser
+                {t("payments.newPayment")}
               </Button>
             }
           />
@@ -240,14 +245,14 @@ export default function PaymentsPage() {
             <table className="w-full text-left border-collapse text-[13px]">
               <thead>
                 <tr className="h-10 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <th className="px-5">N° Reçu</th>
-                  <th className="px-4">Date & Heure</th>
-                  <th className="px-4">Adhérent</th>
-                  <th className="px-4">Formule</th>
-                  <th className="px-4">Mode</th>
-                  <th className="px-4">Opérateur</th>
-                  <th className="px-4 text-right">Montant</th>
-                  <th className="px-5 text-right">Reçu</th>
+                  <th className="px-5">{t("payments.table.receiptNumber")}</th>
+                  <th className="px-4">{t("payments.table.dateTime")}</th>
+                  <th className="px-4">{t("payments.table.member")}</th>
+                  <th className="px-4">{t("payments.table.plan")}</th>
+                  <th className="px-4">{t("payments.table.method")}</th>
+                  <th className="px-4">{t("payments.table.operator")}</th>
+                  <th className="px-4 text-right">{t("payments.table.amount")}</th>
+                  <th className="px-5 text-right">{t("payments.table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -271,15 +276,15 @@ export default function PaymentsPage() {
                     <td className="px-4 text-[#64748B]">
                       {methodLabels[p.method] || p.method}
                     </td>
-                    <td className="px-4 text-[#64748B]">{p.operator?.name || "Système"}</td>
+                    <td className="px-4 text-[#64748B]">{p.operator?.name || tLabels.systemOperator[language]}</td>
                     <td className="px-4 text-right font-bold text-[#0F172A] nums">
                       {formatMoney(p.amount)}
                     </td>
                     <td className="px-5 text-right">
                       <button
                         onClick={() => handleReprint(p.id)}
-                        title="Réimprimer le ticket 80 mm"
-                        className="w-8 h-8 inline-flex items-center justify-center rounded-[6px] text-[#2563EB] hover:bg-[#EFF6FF] border border-transparent hover:border-[#BFDBFE] transition-colors"
+                        title={t("payments.actions.reprint")}
+                        className="w-8 h-8 inline-flex items-center justify-center rounded-[6px] text-[#2563EB] hover:bg-[#EFF6FF] border border-transparent hover:border-[#BFDBFE] transition-colors cursor-pointer"
                       >
                         <Printer className="w-4 h-4" />
                       </button>
@@ -294,24 +299,38 @@ export default function PaymentsPage() {
         {/* Pagination Footer */}
         <div className="h-12 px-5 border-t border-[#F1F5F9] flex items-center justify-between text-[13px] text-[#64748B]">
           <div>
-            Affichage de <span className="font-semibold text-[#0F172A] nums">{payments.length}</span> sur{" "}
-            <span className="font-semibold text-[#0F172A] nums">{total}</span> règlements
+            {language === "ar" ? (
+              <>
+                عرض <span className="font-semibold text-[#0F172A] nums">{payments.length}</span> من أصل{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span> عملية دفع
+              </>
+            ) : language === "en" ? (
+              <>
+                Showing <span className="font-semibold text-[#0F172A] nums">{payments.length}</span> of{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span> payments
+              </>
+            ) : (
+              <>
+                Affichage de <span className="font-semibold text-[#0F172A] nums">{payments.length}</span> sur{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span> règlements
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
             <span className="px-2 font-medium nums">{page}</span>
             <button
               disabled={page * 15 >= total}
               onClick={() => setPage((p) => p + 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         </div>

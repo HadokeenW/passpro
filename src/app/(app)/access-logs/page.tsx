@@ -8,10 +8,12 @@ import { FilterPills } from "@/components/business/FilterPills";
 import { StatusPill } from "@/components/business/StatusPill";
 import { EmptyState } from "@/components/business/EmptyState";
 import { formatDateTime } from "@/lib/dates";
-import { History, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { History, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCachedData, setCachedData } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AccessLogsPage() {
+  const { t } = useTranslation();
   const initialCacheKey = "/api/access/logs?page=1&pageSize=25&decision=all&q=";
   const initialData = getCachedData<any>(initialCacheKey);
 
@@ -68,10 +70,36 @@ export default function AccessLogsPage() {
     return () => window.removeEventListener("passpro:cache-invalidate", onInvalidate);
   }, [page, decision, search]);
 
+  const { language } = useTranslation();
+
+  const translateReason = (reason: string) => {
+    const map: Record<string, { fr: string; en: string; ar: string }> = {
+      CARD_NOT_FOUND: { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      CARD_BLOCKED: { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      CARD_UNASSIGNED: { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      NO_ACTIVE_SUBSCRIPTION: { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      SUBSCRIPTION_EXPIRED: { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      SUBSCRIPTION_SUSPENDED: { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      SESSIONS_EXHAUSTED: { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      OUTSIDE_TIME_WINDOW: { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      OK: { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+      "Badge non reconnu": { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      "Badge bloqué": { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      "Badge non assigné": { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      "Aucun abonnement actif": { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      "Abonnement expiré": { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      "Abonnement suspendu": { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      "Séances épuisées (0 restante)": { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      "Hors créneau horaire autorisé": { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      "Accès autorisé": { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+    };
+    return map[reason]?.[language] || reason;
+  };
+
   const decisionOptions = [
-    { label: "Tous les passages", value: "all" },
-    { label: "Autorisés", value: "granted" },
-    { label: "Refusés", value: "denied" },
+    { label: t("accessLogs.allPassages"), value: "all" },
+    { label: t("accessLogs.granted"), value: "granted" },
+    { label: t("accessLogs.denied"), value: "denied" },
   ];
 
   return (
@@ -79,17 +107,17 @@ export default function AccessLogsPage() {
       {/* 1. Header */}
       <div>
         <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-          Journal d'audit des passages
+          {t("accessLogs.title")}
         </h1>
         <p className="text-[14px] text-[#64748B] mt-0.5">
-          Historique exhaustif et horodaté des scans effectués aux bornes d'accès
+          {t("accessLogs.subtitle")}
         </p>
       </div>
 
       {/* 2. Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-[10px] border border-[#E2E8F0]">
         <SearchInput
-          placeholder="Rechercher par UID, adhérent, borne..."
+          placeholder={t("accessLogs.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -111,31 +139,30 @@ export default function AccessLogsPage() {
       <Card noPadding>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-[#64748B] text-[14px]">
-            Chargement de l'historique des passages...
+            {t("accessLogs.loading")}
           </div>
         ) : logs.length === 0 ? (
           <EmptyState
             icon={<History className="w-8 h-8" />}
-            title="Aucun passage enregistré"
-            description="Aucun scan ne correspond à vos filtres de recherche."
+            title={t("accessLogs.emptyTitle")}
+            description={t("accessLogs.emptyDesc")}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-[13px]">
               <thead>
                 <tr className="h-10 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <th className="px-5">Date & Heure</th>
-                  <th className="px-4">Adhérent</th>
-                  <th className="px-4">Badge UID</th>
-                  <th className="px-4">Borne</th>
-                  <th className="px-4">Source</th>
-                  <th className="px-4">Motif / Statut</th>
-                  <th className="px-5 text-right">Décision</th>
+                  <th className="px-5">{t("accessLogs.table.dateTime")}</th>
+                  <th className="px-4">{t("accessLogs.table.member")}</th>
+                  <th className="px-4">{t("accessLogs.table.badgeUid")}</th>
+                  <th className="px-4">{t("accessLogs.table.kiosk")}</th>
+                  <th className="px-4">{t("accessLogs.table.source")}</th>
+                  <th className="px-4">{t("accessLogs.table.reasonStatus")}</th>
+                  <th className="px-5 text-right">{t("accessLogs.table.decision")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
                 {logs.map((log) => {
-                  const isGranted = log.decision === "GRANTED";
                   return (
                     <tr key={log.id} className="h-12 hover:bg-[#F8FAFC] transition-colors">
                       <td className="px-5 font-medium text-[#0F172A] nums">
@@ -150,7 +177,7 @@ export default function AccessLogsPage() {
                             {log.member.firstName} {log.member.lastName}
                           </Link>
                         ) : (
-                          <span className="text-[#94A3B8] font-normal">Badge non assigné</span>
+                          <span className="text-[#94A3B8] font-normal">{t("accessLogs.unassignedCard")}</span>
                         )}
                       </td>
                       <td className="px-4 font-mono-code text-[#475569] font-medium">
@@ -162,7 +189,7 @@ export default function AccessLogsPage() {
                           {log.source}
                         </span>
                       </td>
-                      <td className="px-4 text-[#64748B]">{log.reason}</td>
+                      <td className="px-4 text-[#64748B]">{translateReason(log.reason)}</td>
                       <td className="px-5 text-right">
                         <StatusPill status={log.decision} />
                       </td>
@@ -177,8 +204,9 @@ export default function AccessLogsPage() {
         {/* Pagination Footer */}
         <div className="h-12 px-5 border-t border-[#F1F5F9] flex items-center justify-between text-[13px] text-[#64748B]">
           <div>
-            Affichage de <span className="font-semibold text-[#0F172A] nums">{logs.length}</span> sur{" "}
-            <span className="font-semibold text-[#0F172A] nums">{total}</span> passages
+            {t("accessLogs.pagination")
+              .replace("{count}", String(logs.length))
+              .replace("{total}", String(total))}
           </div>
           <div className="flex items-center gap-1">
             <button

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { getCachedData, setCachedData } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 interface Metrics {
   activeMembers: number;
@@ -37,10 +38,11 @@ interface Metrics {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [metrics, setMetrics] = useState<Metrics | null>(() => getCachedData("/api/dashboard/metrics"));
   const [heatmapData, setHeatmapData] = useState<any>(() => getCachedData("/api/dashboard/heatmap"));
   const [recentLogs, setRecentLogs] = useState<any[]>(() => getCachedData("/api/dashboard/activity?limit=15") || []);
-  const [isLoading, setIsLoading] = useState(() => !getCachedData("/api/dashboard/metrics"));
+  const [isLoading, setIsLoading] = useState(() => !metrics);
 
   const fetchDashboardData = () => {
     Promise.all([
@@ -87,15 +89,15 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Tableau de bord
+            {t("dashboard.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Activité du club et passages RFID en direct
+            {t("dashboard.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2.5">
           <Link href="/payments">
-            <Button variant="primary">Encaisser un abonnement</Button>
+            <Button variant="primary">{t("dashboard.newSubscription")}</Button>
           </Link>
         </div>
       </div>
@@ -106,9 +108,9 @@ export default function DashboardPage() {
         <div className="lg:col-span-5 flex">
           <KpiCard
             size="hero"
-            label="Adhérents actifs"
+            label={t("dashboard.activeSubs")}
             value={metrics ? metrics.activeMembers : "—"}
-            context="Adhérents avec formule et accès en règle à ce jour"
+            context={t("dashboard.activeSubsContext")}
             icon={<Users className="w-5 h-5" />}
             href="/members?filter=active"
             className="w-full h-full"
@@ -121,25 +123,25 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 flex-1">
             <KpiCard
               size="compact"
-              label="Passages aujourd'hui"
+              label={t("dashboard.todayEntries")}
               value={metrics ? metrics.passagesToday : "—"}
-              context="Scans borne du jour"
+              context={t("dashboard.todayEntriesContext")}
               icon={<ScanLine className="w-4 h-4" />}
               href="/access-logs"
             />
             <KpiCard
               size="compact"
-              label="Recettes du jour"
+              label={t("dashboard.todayRevenue")}
               value={metrics ? formatMoney(metrics.revenueToday) : "—"}
-              context="Caisse aujourd'hui"
+              context={t("dashboard.todayRevenueContext")}
               icon={<Coins className="w-4 h-4" />}
               href="/payments?period=today"
             />
             <KpiCard
               size="compact"
-              label="Recettes du mois"
+              label={t("dashboard.monthRevenue")}
               value={metrics ? formatMoney(metrics.revenueMonth) : "—"}
-              context="Cumul mensuel"
+              context={t("dashboard.monthRevenueContext")}
               icon={<TrendingUp className="w-4 h-4" />}
               href="/payments?period=month"
             />
@@ -149,18 +151,18 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 flex-1">
             <KpiCard
               size="compact"
-              label="Expirent bientôt"
+              label={t("dashboard.expiringSoon")}
               value={metrics ? metrics.expiringSoon : "—"}
-              context="Sous les 7 prochains jours"
+              context={t("dashboard.expiringSoonContext")}
               variant="alert"
               icon={<AlertCircle className="w-4 h-4" />}
               href="/subscriptions?status=expiring"
             />
             <KpiCard
               size="compact"
-              label="Abonnements expirés"
+              label={t("dashboard.expired")}
               value={metrics ? metrics.expired : "—"}
-              context="À renouveler au guichet"
+              context={t("dashboard.expiredContext")}
               variant="alert"
               icon={<CalendarX className="w-4 h-4" />}
               href="/subscriptions?status=expired"
@@ -173,15 +175,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         <div className="lg:col-span-2 flex">
           <Card
-            title="Affluence — 28 derniers jours"
-            subtitle="Distribution des passages par créneau de 2 heures"
+            title={t("dashboard.hourlyHeatmap")}
+            subtitle={t("dashboard.hourlyHeatmapSubtitle")}
             className="w-full flex flex-col justify-between"
           >
             {heatmapData?.buckets ? (
               <Heatmap buckets={heatmapData.buckets} />
             ) : (
               <div className="h-44 flex items-center justify-center text-[#64748B] text-[13px]">
-                Chargement de la cartographie...
+                {t("dashboard.loadingMap")}
               </div>
             )}
           </Card>
@@ -189,8 +191,8 @@ export default function DashboardPage() {
 
         <div className="lg:col-span-1 flex">
           <Card
-            title="Répartition des abonnements"
-            subtitle="Distribution par formule & état"
+            title={t("dashboard.subscriptionBreakdown")}
+            subtitle={t("dashboard.subscriptionBreakdownSubtitle")}
             noPadding
             className="w-full flex flex-col justify-between"
           >
@@ -204,12 +206,12 @@ export default function DashboardPage() {
 
       {/* 3. Recent Activity Feed (Full width) */}
       <Card
-        title="Derniers passages à la borne"
-        subtitle="Flux temps réel des scans et décisions d'accès"
+        title={t("dashboard.recentActivity")}
+        subtitle={t("dashboard.recentActivitySubtitle")}
         action={
           <Link href="/access-logs">
             <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-              Tout le journal
+              {t("dashboard.viewAllLogs")}
             </Button>
           </Link>
         }
@@ -217,7 +219,7 @@ export default function DashboardPage() {
         <div className="divide-y divide-[#F1F5F9] -mx-5 -my-2">
           {recentLogs.length === 0 ? (
             <div className="p-8 text-center text-[#64748B] text-[13px]">
-              Aucun passage récent enregistré
+              {t("dashboard.noRecentActivity")}
             </div>
           ) : (
             recentLogs.map((log) => {
@@ -245,7 +247,7 @@ export default function DashboardPage() {
                       <div className="text-[14px] font-semibold text-[#0F172A] truncate">
                         {log.member
                           ? `${log.member.firstName} ${log.member.lastName}`
-                          : "Badge non assigné"}
+                          : t("dashboard.unassignedBadge")}
                       </div>
                       <div className="text-[12px] text-[#64748B] flex items-center gap-2 mt-0.5">
                         <span className="font-mono-code font-medium">{log.cardUid}</span>

@@ -47,23 +47,24 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const total = await prisma.accessLog.count({ where });
-
-    const logs = await prisma.accessLog.findMany({
-      where,
-      include: {
-        member: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+    const [total, logs] = await Promise.all([
+      prisma.accessLog.count({ where }),
+      prisma.accessLog.findMany({
+        where,
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
 
     return NextResponse.json({
       items: logs,

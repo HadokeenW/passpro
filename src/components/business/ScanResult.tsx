@@ -1,15 +1,23 @@
 import React from "react";
 import { Check, X, AlertTriangle } from "lucide-react";
 import { ScanResult as ScanResultType } from "@/server/services/access-engine";
-import { formatDate } from "@/lib/dates";
+import { formatDate, toLatinDigits } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { useTranslation } from "@/lib/i18n";
 
 interface ScanResultViewProps {
   result: ScanResultType;
   onReset?: () => void;
+  forceFrench?: boolean;
 }
 
-export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset }) => {
+export const ScanResultView: React.FC<ScanResultViewProps> = ({
+  result,
+  onReset,
+  forceFrench = false,
+}) => {
+  const { t, language } = useTranslation();
+  const effectiveLang = forceFrench ? "fr" : language;
   const isGranted = result.decision === "GRANTED";
   const isExpiringSoon =
     isGranted &&
@@ -20,16 +28,37 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
           result.member.daysRemaining >= 0)
     );
 
-  const reasonLabels: Record<string, string> = {
-    CARD_NOT_FOUND: "Badge non reconnu",
-    CARD_BLOCKED: "Badge bloqué",
-    CARD_UNASSIGNED: "Badge non assigné",
-    NO_ACTIVE_SUBSCRIPTION: "Aucun abonnement actif",
-    SUBSCRIPTION_EXPIRED: "Abonnement expiré",
-    SUBSCRIPTION_SUSPENDED: "Abonnement suspendu",
-    SESSIONS_EXHAUSTED: "Séances épuisées (0 restante)",
-    OUTSIDE_TIME_WINDOW: "Hors créneau horaire autorisé",
-    OK: "Accès autorisé",
+  const getReasonLabel = (reason: string) => {
+    const map: Record<string, { fr: string; en: string; ar: string }> = {
+      CARD_NOT_FOUND: { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      CARD_BLOCKED: { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      CARD_UNASSIGNED: { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      NO_ACTIVE_SUBSCRIPTION: { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      SUBSCRIPTION_EXPIRED: { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      SUBSCRIPTION_SUSPENDED: { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      SESSIONS_EXHAUSTED: { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      OUTSIDE_TIME_WINDOW: { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      OK: { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+      "Badge non reconnu": { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
+      "Badge bloqué": { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
+      "Badge non assigné": { fr: "Badge non assigné", en: "Card unassigned", ar: "بطاقة غير مخصصة" },
+      "Aucun abonnement actif": { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
+      "Abonnement expiré": { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
+      "Abonnement suspendu": { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      "Séances épuisées (0 restante)": { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
+      "Hors créneau horaire autorisé": { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      "Accès autorisé": { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
+    };
+
+    if (forceFrench) {
+      return map[reason]?.fr || reason;
+    }
+
+    const key = `kiosk.reasons.${reason}`;
+    const translated = t(key);
+    if (translated && translated !== key) return translated;
+
+    return map[reason]?.[effectiveLang] || reason;
   };
 
   const background = !isGranted
@@ -42,6 +71,7 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
     <div
       role="alert"
       aria-live="assertive"
+      dir={effectiveLang === "ar" ? "rtl" : "ltr"}
       onClick={onReset}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center p-8 text-white select-none cursor-pointer animate-in fade-in zoom-in-[0.96] duration-400"
       style={{ background }}
@@ -89,11 +119,17 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
 
       {/* Decision Big Heading */}
       <div className="text-[28px] md:text-[36px] font-bold tracking-[0.08em] uppercase text-white/90 mb-4 text-center">
-        {!isGranted
-          ? "ACCÈS REFUSÉ"
+        {forceFrench
+          ? !isGranted
+            ? "ACCÈS REFUSÉ"
+            : isExpiringSoon
+            ? "ACCÈS AUTORISÉ · EXPIRATION PROCHE"
+            : "ACCÈS AUTORISÉ"
+          : !isGranted
+          ? t("kiosk.scanDenied")
           : isExpiringSoon
-          ? "ACCÈS AUTORISÉ · ÉCHÉANCE PROCHE"
-          : "ACCÈS AUTORISÉ"}
+          ? `${t("kiosk.scanGranted")} · ${t("kiosk.scanWarning")}`
+          : t("kiosk.scanGranted")}
       </div>
 
       {isGranted && result.member ? (
@@ -113,19 +149,21 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
             {result.member.hasDebt && result.member.balanceDue && (
               <div className="bg-red-600/90 text-white font-bold px-5 py-2 rounded-full border-2 border-white shadow-lg text-[16px] nums flex items-center gap-2">
                 <span>⚠️</span>
-                <span>Reste à payer : {formatMoney(result.member.balanceDue)}</span>
+                <span>
+                  {forceFrench ? "Dette en cours" : t("kiosk.memberDetails.debtAlert")} : {formatMoney(result.member.balanceDue)}
+                </span>
               </div>
             )}
 
             {result.member.planType === "SESSIONS" && (
               <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
-                🎟️ {result.member.remainingSessions ?? 0} séance(s) restante(s)
+                🎟️ {toLatinDigits(String(result.member.remainingSessions ?? 0))} {forceFrench ? "séance(s) restante(s)" : t("kiosk.memberDetails.sessionsRemaining")}
               </div>
             )}
 
             {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
               <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
-                🕒 Créneau : {result.member.startTime} à {result.member.endTime}
+                🕒 {toLatinDigits(result.member.startTime)} - {toLatinDigits(result.member.endTime)}
               </div>
             )}
           </div>
@@ -140,9 +178,15 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
           >
             {isExpiringSoon && <span>⚠️</span>}
             <span>
-              Échéance : {formatDate(result.member.endDate)} · {result.member.daysRemaining} jour
-              {result.member.daysRemaining > 1 ? "s" : ""}
-              {isExpiringSoon ? " (À renouveler)" : ""}
+              {forceFrench ? "Valable jusqu'au" : t("kiosk.memberDetails.validUntil")} :{" "}
+              {formatDate(result.member.endDate, "Africa/Algiers", forceFrench ? "fr" : effectiveLang)} · {toLatinDigits(String(result.member.daysRemaining))}{" "}
+              {result.member.daysRemaining > 1
+                ? forceFrench
+                  ? "jours restants"
+                  : t("kiosk.memberDetails.daysLeftPlural")
+                : forceFrench
+                ? "jour restant"
+                : t("kiosk.memberDetails.daysLeftSingular")}
             </span>
           </div>
         </div>
@@ -150,23 +194,34 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({ result, onReset 
         <div className="flex flex-col items-center text-center max-w-xl">
           {/* Refusal Reason */}
           <h2 className="text-[24px] md:text-[32px] font-semibold text-white mb-4">
-            {reasonLabels[result.reason] || result.reason}
+            {getReasonLabel(result.reason)}
           </h2>
 
           {/* UID in monospace */}
           <div className="bg-black/20 border border-white/20 px-5 py-2 rounded-[8px] font-mono-code text-[16px] md:text-[18px] text-white/90 tracking-[0.1em] mb-4">
-            UID : {result.cardUid}
+            UID : {toLatinDigits(result.cardUid)}
           </div>
 
-          <div className="text-[14px] text-white/70">
-            {new Date(result.loggedAt).toLocaleTimeString("fr-FR")} · {result.kioskName}
+          <div className="text-[14px] text-white/70 nums">
+            {toLatinDigits(
+              new Date(result.loggedAt).toLocaleTimeString(
+                forceFrench
+                  ? "fr-FR"
+                  : effectiveLang === "ar"
+                  ? "ar-DZ-u-nu-latn"
+                  : effectiveLang === "en"
+                  ? "en-US"
+                  : "fr-FR",
+                { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }
+              )
+            )} · {result.kioskName}
           </div>
         </div>
       )}
 
       {/* Subtle bottom note */}
       <div className="absolute bottom-8 text-[13px] text-white/50 tracking-wider">
-        Touchez l'écran ou patientez pour retourner à l'accueil
+        PASSPro · {forceFrench ? "ON-PREMISE LAN READY" : t("kiosk.onPremiseReady")}
       </div>
     </div>
   );

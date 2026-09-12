@@ -12,10 +12,12 @@ export const prisma =
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
  
-// Optimize SQLite on-disk performance (WAL mode, memory cache, fast sync)
+// Optimize SQLite on-disk performance (WAL mode, memory cache, fast sync, mmap RAM speed)
 if (process.env.DATABASE_URL?.includes("file:")) {
   prisma.$queryRawUnsafe("PRAGMA journal_mode = WAL;").catch(() => {});
   prisma.$queryRawUnsafe("PRAGMA synchronous = NORMAL;").catch(() => {});
   prisma.$queryRawUnsafe("PRAGMA cache_size = -64000;").catch(() => {});
   prisma.$queryRawUnsafe("PRAGMA temp_store = MEMORY;").catch(() => {});
+  prisma.$queryRawUnsafe("PRAGMA mmap_size = 268435456;").catch(() => {});
+  prisma.$queryRawUnsafe("PRAGMA busy_timeout = 5000;").catch(() => {});
 }

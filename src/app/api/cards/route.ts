@@ -44,24 +44,25 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const total = await prisma.card.count({ where });
-
-    const cards = await prisma.card.findMany({
-      where,
-      include: {
-        member: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
+    const [total, cards] = await Promise.all([
+      prisma.card.count({ where }),
+      prisma.card.findMany({
+        where,
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
 
     return NextResponse.json({
       items: cards,

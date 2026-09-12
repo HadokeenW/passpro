@@ -23,9 +23,11 @@ import {
 import { useToast } from "@/components/business/Toast";
 
 import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
+import { useTranslation } from "@/lib/i18n";
 
 export default function SubscriptionsPage() {
   const toast = useToast();
+  const { t, language } = useTranslation();
   const initialCacheKey = "/api/subscriptions?page=1&pageSize=15&status=all";
   const initialData = getCachedData<any>(initialCacheKey);
 
@@ -91,17 +93,25 @@ export default function SubscriptionsPage() {
       if (res.ok) {
         invalidateCache(["/api/subscriptions", "/api/dashboard", "/api/members"]);
         toast.success(
-          isSuspended ? "Abonnement réactivé" : "Abonnement suspendu",
-          `Le statut de ${sub.member.firstName} a été actualisé`
+          isSuspended
+            ? language === "ar" ? "تمت إعادة تفعيل الاشتراك" : language === "en" ? "Subscription reactivated" : "Abonnement réactivé"
+            : language === "ar" ? "تم إيقاف الاشتراك مؤقتاً" : language === "en" ? "Subscription suspended" : "Abonnement suspendu",
+          `${sub.member.firstName} ${sub.member.lastName}`
         );
         fetchSubscriptions();
       } else {
         const d = await res.json();
-        toast.error("Action impossible", d.error?.message || "Erreur de mise à jour");
+        toast.error(
+          language === "ar" ? "تعذر تنفيذ الإجراء" : language === "en" ? "Action failed" : "Action impossible",
+          d.error?.message || (language === "ar" ? "خطأ في التحديث" : language === "en" ? "Update error" : "Erreur de mise à jour")
+        );
       }
     } catch (err) {
       console.error(err);
-      toast.error("Erreur réseau", "Impossible de contacter le serveur");
+      toast.error(
+        language === "ar" ? "خطأ في الشبكة" : language === "en" ? "Network error" : "Erreur réseau",
+        language === "ar" ? "تعذر الاتصال بالخادم" : language === "en" ? "Unable to reach server" : "Impossible de contacter le serveur"
+      );
     }
   };
 
@@ -121,20 +131,33 @@ export default function SubscriptionsPage() {
     if (!rawPhone) return null;
     const cleanPhone = rawPhone.startsWith("0") ? `213${rawPhone.slice(1)}` : rawPhone;
     const isExpiring = sub.status === "EXPIRING_SOON";
-    const club = gymName ? `${gymName}` : "de la salle";
-    const msg = isExpiring
-      ? `Bonjour ${sub.member.firstName}, votre abonnement ${club} (${sub.plan.name}) arrive à échéance le ${formatDate(sub.endDate)} (${sub.daysRemaining} jour${sub.daysRemaining > 1 ? "s" : ""} restant${sub.daysRemaining > 1 ? "s" : ""}). Pensez à le renouveler à l'accueil pour continuer vos entraînements sans interruption !`
-      : `Bonjour ${sub.member.firstName}, votre abonnement ${club} (${sub.plan.name}) a expiré le ${formatDate(sub.endDate)}. Venez le renouveler à la salle pour réactiver immédiatement votre badge !`;
+    const club = gymName || (language === "ar" ? "النادي" : language === "en" ? "the gym" : "de la salle");
+
+    let msg = "";
+    if (language === "ar") {
+      msg = isExpiring
+        ? `مرحباً ${sub.member.firstName}، ينتهي اشتراكك في ${club} (${sub.plan.name}) بتاريخ ${formatDate(sub.endDate)} (${sub.daysRemaining} يوم متبقي). يرجى التجديد لدى الاستقبال لمواصلة تدريباتك بدون انقطاع!`
+        : `مرحباً ${sub.member.firstName}، انتهت صلاحية اشتراكك في ${club} (${sub.plan.name}) بتاريخ ${formatDate(sub.endDate)}. تفضل بالتجديد لإعادة تفعيل بطاقتك فوراً!`;
+    } else if (language === "en") {
+      msg = isExpiring
+        ? `Hello ${sub.member.firstName}, your membership at ${club} (${sub.plan.name}) expires on ${formatDate(sub.endDate)} (${sub.daysRemaining} day(s) remaining). Remember to renew at front desk!`
+        : `Hello ${sub.member.firstName}, your membership at ${club} (${sub.plan.name}) expired on ${formatDate(sub.endDate)}. Please renew to reactivate your access badge!`;
+    } else {
+      msg = isExpiring
+        ? `Bonjour ${sub.member.firstName}, votre abonnement ${club} (${sub.plan.name}) arrive à échéance le ${formatDate(sub.endDate)} (${sub.daysRemaining} jour${sub.daysRemaining > 1 ? "s" : ""} restant${sub.daysRemaining > 1 ? "s" : ""}). Pensez à le renouveler à l'accueil pour continuer vos entraînements sans interruption !`
+        : `Bonjour ${sub.member.firstName}, votre abonnement ${club} (${sub.plan.name}) a expiré le ${formatDate(sub.endDate)}. Venez le renouveler à la salle pour réactiver immédiatement votre badge !`;
+    }
+
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
   const filterOptions = [
-    { label: "Tous", value: "all" },
-    { label: "Actifs", value: "active" },
-    { label: "Expirent bientôt", value: "expiring" },
-    { label: "Expirés", value: "expired" },
-    { label: "Suspendus", value: "suspended" },
-    { label: "Avec reste à payer", value: "debt" },
+    { label: t("subscriptions.filters.all"), value: "all" },
+    { label: t("subscriptions.filters.active"), value: "active" },
+    { label: t("subscriptions.filters.expiring"), value: "expiring" },
+    { label: t("subscriptions.filters.expired"), value: "expired" },
+    { label: t("subscriptions.filters.suspended"), value: "suspended" },
+    { label: t("subscriptions.filters.debt"), value: "debt" },
   ];
 
   return (
@@ -143,10 +166,10 @@ export default function SubscriptionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#0F172A] tracking-tight">
-            Suivi des abonnements
+            {t("subscriptions.title")}
           </h1>
           <p className="text-[14px] text-[#64748B] mt-0.5">
-            Surveillance des échéances et statut calculé en temps réel
+            {t("subscriptions.subtitle")}
           </p>
         </div>
       </div>
@@ -162,7 +185,7 @@ export default function SubscriptionsPage() {
           }}
         />
         <div className="text-[13px] text-[#64748B]">
-          Total : <span className="font-semibold text-[#0F172A] nums">{total}</span> abonnements
+          {language === "ar" ? "الإجمالي :" : language === "en" ? "Total:" : "Total :"} <span className="font-semibold text-[#0F172A] nums">{total}</span>
         </div>
       </div>
 
@@ -170,26 +193,25 @@ export default function SubscriptionsPage() {
       <Card noPadding>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-[#64748B] text-[14px]">
-            Chargement des abonnements...
+            {t("subscriptions.loading")}
           </div>
         ) : subscriptions.length === 0 ? (
           <EmptyState
             icon={<CalendarCheck className="w-8 h-8" />}
-            title="Aucun abonnement trouvé"
-            description="Aucun dossier ne correspond à ce filtre de statut."
+            title={t("subscriptions.emptyTitle")}
+            description={t("subscriptions.emptyDesc")}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-[13px]">
               <thead>
                 <tr className="h-10 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[12px] font-semibold text-[#64748B] uppercase tracking-wider">
-                  <th className="px-5">Adhérent</th>
-                  <th className="px-4">Formule</th>
-                  <th className="px-4">Date de début</th>
-                  <th className="px-4">Échéance</th>
-                  <th className="px-4">Validité restante</th>
-                  <th className="px-4 text-center">Statut</th>
-                  <th className="px-5 text-right">Actions</th>
+                  <th className="px-5">{t("subscriptions.table.member")}</th>
+                  <th className="px-4">{t("subscriptions.table.planPrice")}</th>
+                  <th className="px-4">{t("subscriptions.table.period")}</th>
+                  <th className="px-4">{t("subscriptions.table.balanceDue")}</th>
+                  <th className="px-4 text-center">{t("subscriptions.table.status")}</th>
+                  <th className="px-5 text-right">{t("subscriptions.table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -209,7 +231,7 @@ export default function SubscriptionsPage() {
                           <span>{s.plan.name}</span>
                           {s.planType === "SESSIONS" && (
                             <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                              🎟️ {s.remainingSessions ?? 0} séanc.
+                              🎟️ {s.remainingSessions ?? 0} {language === "ar" ? "حصص" : language === "en" ? "sess." : "séanc."}
                             </span>
                           )}
                           {s.planType === "TIME_SLOT" && (
@@ -221,21 +243,20 @@ export default function SubscriptionsPage() {
                         {s.balanceDue > 0 && (
                           <div>
                             <span className="text-[11px] font-bold px-1.5 py-0.2 rounded bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
-                              Reste : {formatMoney(s.balanceDue)}
+                              {language === "ar" ? "متبقي :" : language === "en" ? "Due:" : "Reste :"} {formatMoney(s.balanceDue)}
                             </span>
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 text-[#64748B] nums">{formatDate(s.startDate)}</td>
-                    <td className="px-4 text-[#64748B] nums">{formatDate(s.endDate)}</td>
+                    <td className="px-4 text-[#64748B] nums">
+                      {formatDate(s.startDate)} — {formatDate(s.endDate)}
+                    </td>
                     <td className="px-4 font-semibold nums">
-                      {s.daysRemaining > 0 ? (
-                        <span className={s.daysRemaining <= 7 ? "text-[#D97706]" : "text-[#0F172A]"}>
-                          {s.daysRemaining} j
-                        </span>
+                      {s.balanceDue > 0 ? (
+                        <span className="text-[#DC2626]">{formatMoney(s.balanceDue)}</span>
                       ) : (
-                        <span className="text-[#DC2626]">Expiré</span>
+                        <span className="text-[#059669]">0 DZD</span>
                       )}
                     </td>
                     <td className="px-4 text-center">
@@ -245,8 +266,8 @@ export default function SubscriptionsPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleToggleSuspend(s)}
-                          title={s.status === "SUSPENDED" ? "Réactiver" : "Suspendre"}
-                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
+                          title={s.status === "SUSPENDED" ? t("subscriptions.actions.reactivate") : t("subscriptions.actions.suspend")}
+                          className="w-7 h-7 flex items-center justify-center rounded text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors cursor-pointer"
                         >
                           {s.status === "SUSPENDED" ? (
                             <PlayCircle className="w-4 h-4 text-[#059669]" />
@@ -260,7 +281,7 @@ export default function SubscriptionsPage() {
                             href={getWhatsAppUrl(s)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="Envoyer un rappel de renouvellement sur WhatsApp"
+                            title={t("subscriptions.actions.whatsapp")}
                             className="w-7 h-7 flex items-center justify-center rounded text-[#059669] hover:text-[#047857] hover:bg-[#ECFDF5] transition-colors"
                           >
                             <MessageCircle className="w-4 h-4" />
@@ -276,7 +297,7 @@ export default function SubscriptionsPage() {
                             setIsPaymentModalOpen(true);
                           }}
                         >
-                          Renouveler
+                          {language === "ar" ? "تجديد" : language === "en" ? "Renew" : "Renouveler"}
                         </Button>
                       </div>
                     </td>
@@ -290,24 +311,38 @@ export default function SubscriptionsPage() {
         {/* Pagination Footer */}
         <div className="h-12 px-5 border-t border-[#F1F5F9] flex items-center justify-between text-[13px] text-[#64748B]">
           <div>
-            Affichage de <span className="font-semibold text-[#0F172A] nums">{subscriptions.length}</span> sur{" "}
-            <span className="font-semibold text-[#0F172A] nums">{total}</span> abonnements
+            {language === "ar" ? (
+              <>
+                عرض <span className="font-semibold text-[#0F172A] nums">{subscriptions.length}</span> من أصل{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            ) : language === "en" ? (
+              <>
+                Showing <span className="font-semibold text-[#0F172A] nums">{subscriptions.length}</span> of{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            ) : (
+              <>
+                Affichage de <span className="font-semibold text-[#0F172A] nums">{subscriptions.length}</span> sur{" "}
+                <span className="font-semibold text-[#0F172A] nums">{total}</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
             <span className="px-2 font-medium nums">{page}</span>
             <button
               disabled={page * 15 >= total}
               onClick={() => setPage((p) => p + 1)}
-              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded flex items-center justify-center border border-[#E2E8F0] hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         </div>
