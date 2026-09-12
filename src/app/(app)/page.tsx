@@ -156,7 +156,7 @@ export default function DashboardPage() {
               context={t("dashboard.expiringSoonContext")}
               variant="alert"
               icon={<AlertCircle className="w-4 h-4" />}
-              href="/subscriptions?status=expiring"
+              href="/members?filter=expiring_soon"
             />
             <KpiCard
               size="compact"
@@ -165,7 +165,7 @@ export default function DashboardPage() {
               context={t("dashboard.expiredContext")}
               variant="alert"
               icon={<CalendarX className="w-4 h-4" />}
-              href="/subscriptions?status=expired"
+              href="/members?filter=expired"
             />
           </div>
         </div>

@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { formatMoney } from "@/lib/money";
 import { invalidateCache } from "@/lib/cache";
 import { useTranslation } from "@/lib/i18n";
+import { Ticket, Clock, Calendar, AlertTriangle } from "lucide-react";
 
 interface Plan {
   id: string;
@@ -137,9 +138,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       ar: `تحصيل ${amt}`,
     }),
     debtNotice: (bal: string) => ({
-      fr: `⚠️ Ce montant restant (${bal}) sera consigné sur le ticket et rappelé lors des prochains passages de l'adhérent.`,
-      en: `⚠️ This remaining balance (${bal}) will appear on the receipt and be recalled on future entries.`,
-      ar: `⚠️ سيتم تسجيل هذا الرصيد المتبقي (${bal}) على الوصل وتذكير المشترك به عند الدخول.`,
+      fr: `Ce montant restant (${bal}) sera consigné sur le ticket et rappelé lors des prochains passages de l'adhérent.`,
+      en: `This remaining balance (${bal}) will appear on the receipt and be recalled on future entries.`,
+      ar: `سيتم تسجيل هذا الرصيد المتبقي (${bal}) على الوصل وتذكير المشترك به عند الدخول.`,
     }),
     toastDebtSuccess: { fr: "Solde encaissé", en: "Balance Collected", ar: "تم تحصيل الرصيد" },
     toastSubSuccess: { fr: "Règlement enregistré", en: "Payment Recorded", ar: "تم تسجيل الدفع" },
@@ -456,8 +457,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           <div className="text-[13px] font-semibold text-[#0F172A] leading-tight">
                             {p.name}
                           </div>
-                          <span className="text-[12px]">
-                            {p.planType === "SESSIONS" ? "🎟️" : p.planType === "TIME_SLOT" ? "🕒" : "⏱️"}
+                          <span className="shrink-0">
+                            {p.planType === "SESSIONS" ? (
+                              <Ticket className="w-3.5 h-3.5 text-[#4F46E5]" />
+                            ) : p.planType === "TIME_SLOT" ? (
+                              <Clock className="w-3.5 h-3.5 text-[#D97706]" />
+                            ) : (
+                              <Calendar className="w-3.5 h-3.5 text-[#2563EB]" />
+                            )}
                           </span>
                         </div>
                         <div className="text-[11px] text-[#64748B] mt-0.5">
@@ -578,9 +585,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       <span className="nums">{formatMoney(balanceDue)}</span>
                     </div>
                     {balanceDue > 0 && (
-                      <p className="text-[11px] mt-2 opacity-90 leading-tight">
-                        {tLabels.debtNotice(formatMoney(balanceDue))[language]}
-                      </p>
+                      <div className="flex items-start gap-1.5 text-[11px] mt-2 opacity-90 leading-tight">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 mt-0.5" />
+                        <p>{tLabels.debtNotice(formatMoney(balanceDue))[language]}</p>
+                      </div>
                     )}
                   </div>
                 </div>

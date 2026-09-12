@@ -18,6 +18,7 @@ import {
   CreditCard,
   User,
   AlertTriangle,
+  Check,
 } from "lucide-react";
 
 interface PlanItem {
@@ -250,10 +251,10 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
         setCardStatus("AVAILABLE");
         setCardMessage(
           language === "ar"
-            ? "بطاقة جديدة متاحة ✓"
+            ? "بطاقة جديدة متاحة"
             : language === "en"
-            ? "Card available ✓"
-            : "Carte disponible ✓"
+            ? "Card available"
+            : "Carte disponible"
         );
       } else if (res.ok) {
         const cardData = await res.json();
@@ -274,21 +275,21 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
           setCardStatus("AVAILABLE");
           setCardMessage(
             language === "ar"
-              ? "بطاقة متوفرة للتعيين ✓"
+              ? "بطاقة متوفرة للتعيين"
               : language === "en"
-              ? "Card available for assignment ✓"
-              : "Carte disponible ✓"
+              ? "Card available for assignment"
+              : "Carte disponible"
           );
         }
       } else {
         setCardStatus("AVAILABLE");
         setCardMessage(
-          language === "ar" ? "بطاقة جاهزة ✓" : language === "en" ? "Card ready ✓" : "Carte disponible ✓"
+          language === "ar" ? "بطاقة جاهزة" : language === "en" ? "Card ready" : "Carte disponible"
         );
       }
     } catch {
       setCardStatus("AVAILABLE");
-      setCardMessage("Carte disponible ✓");
+      setCardMessage("Carte disponible");
     } finally {
       setIsCheckingCard(false);
     }
@@ -515,7 +516,7 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
                       : "bg-[#E2E8F0] text-[#64748B]"
                   }`}
                 >
-                  {currentStep > 1 ? "✓" : "1"}
+                  {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : "1"}
                 </div>
                 <span>{language === "ar" ? "العميل" : language === "en" ? "Client" : "Client"}</span>
               </div>
@@ -551,7 +552,7 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
                       : "bg-[#E2E8F0] text-[#64748B]"
                   }`}
                 >
-                  {currentStep > 2 ? "✓" : "2"}
+                  {currentStep > 2 ? <Check className="w-3.5 h-3.5" /> : "2"}
                 </div>
                 <span>{language === "ar" ? "الاشتراك" : language === "en" ? "Subscription" : "Abonnement"}</span>
               </div>
@@ -662,7 +663,7 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
                       <div className="flex items-center gap-2">
                         <span className="text-[12px] font-medium text-emerald-600 flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          {language === "ar" ? "تمت إضافة الصورة ✓" : language === "en" ? "Photo added ✓" : "Photo enregistrée ✓"}
+                          {language === "ar" ? "تمت إضافة الصورة" : language === "en" ? "Photo added" : "Photo enregistrée"}
                         </span>
                         <button
                           type="button"
@@ -806,8 +807,9 @@ export const MemberOnboardingWizardModal: React.FC<MemberOnboardingWizardModalPr
                       <div className="text-[13px] font-mono-code font-bold tracking-wider nums">
                         UID : {toLatinDigits(cardUid)}
                       </div>
-                      <div className="text-[11px] font-medium mt-0.5">
-                        {cardMessage || (cardStatus === "TAKEN" ? "Carte indisponible" : "Carte disponible ✓")}
+                      <div className="text-[11px] font-medium mt-0.5 flex items-center gap-1">
+                        {cardStatus !== "TAKEN" && <Check className="w-3 h-3 text-emerald-600 shrink-0" />}
+                        <span>{cardMessage || (cardStatus === "TAKEN" ? "Carte indisponible" : "Carte disponible")}</span>
                       </div>
                     </div>
                     <button

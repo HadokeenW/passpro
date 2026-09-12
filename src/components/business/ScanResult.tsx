@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, X, AlertTriangle } from "lucide-react";
+import { Check, X, AlertTriangle, Ticket, Clock } from "lucide-react";
 import { ScanResult as ScanResultType } from "@/server/services/access-engine";
 import { formatDate, toLatinDigits } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
@@ -148,7 +148,7 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
           <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
             {result.member.hasDebt && result.member.balanceDue && (
               <div className="bg-red-600/90 text-white font-bold px-5 py-2 rounded-full border-2 border-white shadow-lg text-[16px] nums flex items-center gap-2">
-                <span>⚠️</span>
+                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
                 <span>
                   {forceFrench ? "Dette en cours" : t("kiosk.memberDetails.debtAlert")} : {formatMoney(result.member.balanceDue)}
                 </span>
@@ -156,14 +156,20 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
             )}
 
             {result.member.planType === "SESSIONS" && (
-              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
-                🎟️ {toLatinDigits(String(result.member.remainingSessions ?? 0))} {forceFrench ? "séance(s) restante(s)" : t("kiosk.memberDetails.sessionsRemaining")}
+              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
+                <Ticket className="w-4 h-4 shrink-0" />
+                <span>
+                  {toLatinDigits(String(result.member.remainingSessions ?? 0))} {forceFrench ? "séance(s) restante(s)" : t("kiosk.memberDetails.sessionsRemaining")}
+                </span>
               </div>
             )}
 
             {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
-              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums">
-                🕒 {toLatinDigits(result.member.startTime)} - {toLatinDigits(result.member.endTime)}
+              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
+                <Clock className="w-4 h-4 shrink-0" />
+                <span>
+                  {toLatinDigits(result.member.startTime)} - {toLatinDigits(result.member.endTime)}
+                </span>
               </div>
             )}
           </div>
@@ -176,7 +182,7 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
                 : "bg-white/20 border-white/30"
             }`}
           >
-            {isExpiringSoon && <span>⚠️</span>}
+            {isExpiringSoon && <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0" />}
             <span>
               {forceFrench ? "Valable jusqu'au" : t("kiosk.memberDetails.validUntil")} :{" "}
               {formatDate(result.member.endDate, "Africa/Algiers", forceFrench ? "fr" : effectiveLang)} · {toLatinDigits(String(result.member.daysRemaining))}{" "}

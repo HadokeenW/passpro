@@ -76,12 +76,12 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={toastHelpers}>
       {children}
       {/* Toast viewport */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={cn(
-              "w-[360px] bg-white rounded-[12px] p-4 shadow-[0_4px_12px_rgba(15,23,42,0.08)] border border-[#E2E8F0] border-l-[4px] pointer-events-auto flex items-start gap-3 animate-in slide-in-from-bottom-2 fade-in duration-200",
+              "w-[360px] bg-white rounded-[12px] p-4 shadow-[0_4px_12px_rgba(15,23,42,0.08)] border border-[#E2E8F0] border-l-[4px] pointer-events-auto flex items-start gap-3 animate-toast",
               borderColors[t.type]
             )}
           >

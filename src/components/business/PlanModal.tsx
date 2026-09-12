@@ -7,6 +7,7 @@ import { Field } from "./Field";
 import { useToast } from "./Toast";
 import { invalidateCache } from "@/lib/cache";
 import { useTranslation } from "@/lib/i18n";
+import { Calendar, Ticket, Clock } from "lucide-react";
 
 interface PlanModalProps {
   isOpen: boolean;
@@ -257,22 +258,26 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                 id: "TEMPORAL",
                 label: tLabels.types.TEMPORAL.label[language],
                 desc: tLabels.types.TEMPORAL.desc[language],
-                icon: "⏱️",
+                icon: Calendar,
+                iconColor: "text-[#2563EB]",
               },
               {
                 id: "SESSIONS",
                 label: tLabels.types.SESSIONS.label[language],
                 desc: tLabels.types.SESSIONS.desc[language],
-                icon: "🎟️",
+                icon: Ticket,
+                iconColor: "text-[#4F46E5]",
               },
               {
                 id: "TIME_SLOT",
                 label: tLabels.types.TIME_SLOT.label[language],
                 desc: tLabels.types.TIME_SLOT.desc[language],
-                icon: "🕒",
+                icon: Clock,
+                iconColor: "text-[#D97706]",
               },
             ].map((t) => {
               const isSelected = planType === t.id;
+              const IconComp = t.icon;
               return (
                 <button
                   type="button"
@@ -285,7 +290,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-bold text-[13px] text-[#0F172A]">
-                    <span>{t.icon}</span>
+                    <IconComp className={`w-4 h-4 shrink-0 ${t.iconColor}`} />
                     <span>{t.label}</span>
                   </div>
                   <div className="text-[11px] text-[#64748B] mt-1 leading-tight">
@@ -315,7 +320,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
         {planType === "SESSIONS" && (
           <div className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-2.5">
             <div className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5">
-              <span>🎟️</span>
+              <Ticket className="w-4 h-4 text-[#4F46E5]" />
               <span>{tLabels.sessionConfig[language]}</span>
             </div>
             <div className="flex items-center gap-3">
@@ -356,7 +361,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
         {planType === "TIME_SLOT" && (
           <div className="p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[8px] space-y-2.5">
             <div className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5">
-              <span>🕒</span>
+              <Clock className="w-4 h-4 text-[#D97706]" />
               <span>{tLabels.timeSlotConfig[language]}</span>
             </div>
             <div className="grid grid-cols-2 gap-3">

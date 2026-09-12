@@ -156,6 +156,8 @@ export const en: TranslationSchema = {
     filters: {
       all: "All",
       active: "Active",
+      expiring_soon: "Expiring soon",
+      expired: "Expired",
       inactive: "Inactive",
       debt: "With Debt / Credit",
       blocked: "Blocked Cards",

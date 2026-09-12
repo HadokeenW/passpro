@@ -30,6 +30,9 @@ import {
   ShieldCheck,
   ArrowLeft,
   Camera,
+  AlertTriangle,
+  Ticket,
+  Clock,
 } from "lucide-react";
 
 interface MemberDossier {
@@ -75,7 +78,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   const tLabels = {
     loading: { fr: "Chargement du dossier adhérent...", en: "Loading member dossier...", ar: "جاري تحميل ملف المشترك..." },
     changePhotoTooltip: { fr: "Cliquer pour changer la photo", en: "Click to change photo", ar: "اضغط لتغيير الصورة" },
-    dueNotice: { fr: "⚠️ Reste à payer :", en: "⚠️ Balance due:", ar: "⚠️ المتبقي للدفع:" },
+    dueNotice: { fr: "Reste à payer :", en: "Balance due:", ar: "المتبقي للدفع:" },
     phonePrefix: { fr: "Tél :", en: "Phone:", ar: "الهاتف:" },
     emailPrefix: { fr: "Email :", en: "Email:", ar: "البريد:" },
     registeredPrefix: { fr: "Inscrit le", en: "Registered on", ar: "مسجل بتاريخ" },
@@ -87,8 +90,8 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     }),
     renewBtn: { fr: "Renouveler", en: "Renew", ar: "تجديد" },
     activeSubCardTitle: { fr: "Abonnement en cours", en: "Current Subscription", ar: "الاشتراك الحالي" },
-    sessionsPlanBadge: { fr: "🎟️ Formule par séances", en: "🎟️ Session-based plan", ar: "🎟️ اشتراك بالحصص" },
-    timeSlotPlanBadge: { fr: "🕒 Formule heure exacte", en: "🕒 Time-slot plan", ar: "🕒 اشتراك فترة محددة" },
+    sessionsPlanBadge: { fr: "Formule par séances", en: "Session-based plan", ar: "اشتراك بالحصص" },
+    timeSlotPlanBadge: { fr: "Formule heure exacte", en: "Time-slot plan", ar: "اشتراك فترة محددة" },
     planRate: { fr: "Tarif formule :", en: "Plan price:", ar: "سعر الاشتراك:" },
     daysSuffix: { fr: "jours", en: "days", ar: "أيام" },
     allowedHours: { fr: "Horaires autorisés :", en: "Allowed hours:", ar: "الأوقات المسموحة:" },
@@ -429,8 +432,9 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   }
                 />
                 {currentSubscription?.balanceDue > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
-                    {tLabels.dueNotice[language]} {formatMoney(currentSubscription.balanceDue)}
+                  <span className="px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums inline-flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{tLabels.dueNotice[language]} {formatMoney(currentSubscription.balanceDue)}</span>
                   </span>
                 )}
               </div>
@@ -527,13 +531,15 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                         {currentSubscription.planName}
                       </h3>
                       {currentSubscription.planType === "SESSIONS" && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                          {tLabels.sessionsPlanBadge[language]}
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] inline-flex items-center gap-1">
+                          <Ticket className="w-3.5 h-3.5 shrink-0" />
+                          <span>{tLabels.sessionsPlanBadge[language]}</span>
                         </span>
                       )}
                       {currentSubscription.planType === "TIME_SLOT" && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
-                          {tLabels.timeSlotPlanBadge[language]}
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A] inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>{tLabels.timeSlotPlanBadge[language]}</span>
                         </span>
                       )}
                     </div>
@@ -551,7 +557,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                 {currentSubscription.balanceDue > 0 && (
                   <div className="p-3.5 bg-[#FEF2F2] border border-[#FECACA] rounded-[8px] flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-2.5">
-                      <span className="text-[20px]">⚠️</span>
+                      <AlertTriangle className="w-5 h-5 text-[#DC2626] shrink-0" />
                       <div>
                         <div className="text-[13px] font-bold text-[#991B1B]">
                           {tLabels.creditGrantedDue[language]} {formatMoney(currentSubscription.balanceDue)}

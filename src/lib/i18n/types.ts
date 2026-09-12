@@ -14,21 +14,21 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
     code: "fr",
     label: "Français",
     nativeLabel: "Français",
-    flag: "🇫🇷",
+    flag: "FR",
     dir: "ltr",
   },
   {
     code: "en",
     label: "English",
     nativeLabel: "English",
-    flag: "🇬🇧",
+    flag: "EN",
     dir: "ltr",
   },
   {
     code: "ar",
     label: "Arabe",
     nativeLabel: "العربية",
-    flag: "🇸🇦",
+    flag: "AR",
     dir: "rtl",
   },
 ];
@@ -189,6 +189,8 @@ export interface TranslationSchema {
     filters: {
       all: string;
       active: string;
+      expiring_soon: string;
+      expired: string;
       inactive: string;
       debt: string;
       blocked: string;

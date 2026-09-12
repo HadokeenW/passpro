@@ -29,11 +29,30 @@ export async function GET(req: NextRequest) {
     }
 
     const now = new Date();
+    const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
     if (filter === "active") {
       where.subscriptions = {
         some: {
           status: "ACTIVE",
           endDate: { gte: now },
+        },
+      };
+    } else if (filter === "expiring_soon") {
+      where.subscriptions = {
+        some: {
+          status: "ACTIVE",
+          endDate: { gte: now, lte: soon },
+        },
+      };
+    } else if (filter === "expired") {
+      where.subscriptions = {
+        some: {
+          OR: [
+            { status: "EXPIRED" },
+            { endDate: { lt: now } },
+            { remainingSessions: { lte: 0 } },
+          ],
         },
       };
     } else if (filter === "inactive") {

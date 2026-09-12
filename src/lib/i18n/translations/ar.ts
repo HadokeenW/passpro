@@ -156,6 +156,8 @@ export const ar: TranslationSchema = {
     filters: {
       all: "الكل",
       active: "النشطون",
+      expiring_soon: "ينتهي قريباً",
+      expired: "منتهية الصلاحية",
       inactive: "غير النشطين",
       debt: "عليهم مستحقات / رصيد",
       blocked: "بطاقات محظورة",

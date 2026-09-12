@@ -38,8 +38,6 @@ import { MemberOnboardingWizardModal } from "@/components/business/MemberOnboard
 const routePrewarmMap: Record<string, string[]> = {
   "/": ["/api/dashboard/metrics", "/api/dashboard/heatmap", "/api/dashboard/activity?limit=15"],
   "/members": ["/api/members?page=1&pageSize=15&filter=all&q="],
-  "/subscriptions": ["/api/subscriptions?page=1&pageSize=15&status=all"],
-  "/cards": ["/api/cards?page=1&pageSize=15&status=all&q="],
   "/payments": ["/api/payments?page=1&pageSize=15&period=today"],
   "/access-logs": ["/api/access/logs?page=1&pageSize=25&decision=all&q="],
   "/plans": ["/api/plans?includeInactive=true"],
@@ -436,9 +434,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: t("nav.management"),
       items: [
         { href: "/members", label: t("nav.members"), icon: Users },
-        { href: "/subscriptions", label: t("nav.subscriptions"), icon: CalendarCheck },
         { href: "/plans", label: t("nav.plans"), icon: Tags },
-        { href: "/cards", label: t("nav.cards"), icon: CreditCard },
       ],
     },
     {
@@ -742,7 +738,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               {/* Search Results Dropdown Palette */}
               {isSearchOpen && (
-                <div className="absolute top-9 left-0 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute top-9 left-0 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-dropdown">
                   {isSearching ? (
                     <div className="p-4 text-center text-[13px] text-[#64748B]">
                       {tLayout.searching[language]}
@@ -960,7 +956,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               {/* Popover Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[380px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-dropdown">
                   {/* Popover Header */}
                   <div className="p-3.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1126,7 +1122,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Profile Dropdown Menu */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[240px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-in fade-in slide-in-from-top-2 duration-150 p-1.5">
+                  <div className="absolute right-0 rtl:right-auto rtl:left-0 top-11 w-[240px] bg-white rounded-[16px] shadow-2xl border border-[#E2E8F0] z-50 overflow-hidden text-[#0F172A] animate-dropdown p-1.5">
                     {/* User Identity Header */}
                     <div className="p-3 bg-[#F8FAFC] rounded-[12px] mb-1">
                       <div className="text-[13px] font-bold text-[#0F172A] truncate">

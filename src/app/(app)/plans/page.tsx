@@ -7,7 +7,7 @@ import { PlanModal } from "@/components/business/PlanModal";
 import { Modal } from "@/components/business/Modal";
 import { useToast } from "@/components/business/Toast";
 import { formatMoney } from "@/lib/money";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Ticket, Clock } from "lucide-react";
 import { getCachedData, setCachedData, invalidateCache } from "@/lib/cache";
 import { useTranslation } from "@/lib/i18n";
 
@@ -218,13 +218,15 @@ export default function PlansPage() {
                     <h3 className="text-[16px] font-bold text-[#0F172A]">{p.name}</h3>
                     <div className="flex items-center gap-1.5">
                       {p.planType === "SESSIONS" && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                          🎟️ {p.sessionCount || 10} {t("plans.sessionsCount")}
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] inline-flex items-center gap-1">
+                          <Ticket className="w-3 h-3 shrink-0" />
+                          <span>{p.sessionCount || 10} {t("plans.sessionsCount")}</span>
                         </span>
                       )}
                       {p.planType === "TIME_SLOT" && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]">
-                          🕒 {p.startTime || "13:00"} - {p.endTime || "16:00"}
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A] inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>{p.startTime || "13:00"} - {p.endTime || "16:00"}</span>
                         </span>
                       )}
                       <span

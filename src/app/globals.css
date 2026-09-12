@@ -64,28 +64,132 @@
 
 /* Smooth View & Route Transitions */
 @keyframes pageIn {
-  from {
-    opacity: 0.88;
-    transform: translateY(3px);
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.995);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .page-enter {
-  animation: pageIn 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+  animation: pageIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal Backdrop Smooth Entrance & Exit */
+@keyframes backdropFadeIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+}
+
+@keyframes backdropFadeOut {
+  0% {
+    opacity: 1;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  100% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+}
+
+.animate-backdrop-in,
+.animate-backdrop {
+  animation: backdropFadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-backdrop-out {
+  animation: backdropFadeOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Modal Frame Entrance & Exit (Spring Damped) */
+@keyframes frameFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes frameFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+
+.animate-frame-in,
+.animate-frame {
+  animation: frameFadeIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-frame-out {
+  animation: frameFadeOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Popover & Dropdown Entrance */
+@keyframes dropdownIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdownIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top;
+}
+
+/* Toast Smooth Entrance */
+@keyframes toastIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast {
+  animation: toastIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Tactile Micro-Interactions */
 .btn-tactile {
   transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
 }
 .btn-tactile:active {
   transform: scale(0.97);
+}
+
+/* Smooth Table Row Transitions */
+tr {
+  transition: background-color 150ms ease;
 }
 
 /* Instant Top Navigation Progress Bar */

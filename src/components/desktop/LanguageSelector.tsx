@@ -49,7 +49,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <span className="text-xl leading-none">{item.flag}</span>
+                <span className="w-8 h-8 rounded-[8px] bg-slate-100 flex items-center justify-center font-bold text-[11px] text-slate-700 font-mono select-none shrink-0 border border-slate-200">
+                  {item.flag}
+                </span>
                 <div>
                   <div
                     className={`text-[13.5px] font-semibold leading-tight ${
@@ -102,7 +104,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       {/* Popover Menu */}
       {isOpen && (
         <div
-          className={`absolute z-[120] mt-1.5 min-w-[130px] rounded-[10px] shadow-xl border p-1 text-[12px] animate-in fade-in zoom-in-95 duration-100 ${
+          className={`absolute z-[120] mt-1.5 min-w-[130px] rounded-[10px] shadow-xl border p-1 text-[12px] animate-dropdown ${
             currentLanguageInfo.dir === "rtl" ? "left-0" : "right-0"
           } ${
             isDark
@@ -131,7 +133,11 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm leading-none">{item.flag}</span>
+                  <span className={`w-5 h-5 rounded-[5px] flex items-center justify-center font-bold text-[10px] font-mono select-none shrink-0 ${
+                    isDark ? "bg-white/10 text-white/90" : "bg-slate-100 text-slate-700"
+                  }`}>
+                    {item.flag}
+                  </span>
                   <span>{item.nativeLabel}</span>
                 </div>
                 {isSelected && (

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 import { ScanResult } from "@/server/services/access-engine";
-import { ScanLine, Check, X } from "lucide-react";
+import { ScanLine, Check, X, Ticket, Clock, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { useTranslation } from "@/lib/i18n";
@@ -36,19 +36,19 @@ export const QuickScanWidget: React.FC = () => {
       ar: `${days} يوم متبقي`,
     }),
     sessionDeducted: (rem: number, tot: number) => ({
-      fr: `🎟️ Séance décomptée · ${rem} restante(s) sur ${tot}`,
-      en: `🎟️ Session deducted · ${rem} remaining of ${tot}`,
-      ar: `🎟️ تم خصم حصة · ${rem} متبقية من أصل ${tot}`,
+      fr: `Séance décomptée · ${rem} restante(s) sur ${tot}`,
+      en: `Session deducted · ${rem} remaining of ${tot}`,
+      ar: `تم خصم حصة · ${rem} متبقية من أصل ${tot}`,
     }),
     timeSlot: (start: string, end: string) => ({
-      fr: `🕒 Créneau autorisé : ${start} à ${end}`,
-      en: `🕒 Permitted slot: ${start} to ${end}`,
-      ar: `🕒 الفترة المسموح بها: ${start} إلى ${end}`,
+      fr: `Créneau autorisé : ${start} à ${end}`,
+      en: `Permitted slot: ${start} to ${end}`,
+      ar: `الفترة المسموح بها: ${start} إلى ${end}`,
     }),
     debtWarning: (balance: number) => ({
-      fr: `⚠️ Attention : Solde dû de ${formatMoney(balance)}`,
-      en: `⚠️ Warning: Outstanding balance of ${formatMoney(balance)}`,
-      ar: `⚠️ تنبيه: رصيد مستحق بقيمة ${formatMoney(balance)}`,
+      fr: `Attention : Solde dû de ${formatMoney(balance)}`,
+      en: `Warning: Outstanding balance of ${formatMoney(balance)}`,
+      ar: `تنبيه: رصيد مستحق بقيمة ${formatMoney(balance)}`,
     }),
     reasonPrefix: { fr: "Motif :", en: "Reason:", ar: "السبب:" },
   };
@@ -192,23 +192,30 @@ export const QuickScanWidget: React.FC = () => {
                     </div>
 
                     {result.member.planType === "SESSIONS" && (
-                      <div className="text-[11px] font-semibold text-[#1E40AF]">
-                        {tLabels.sessionDeducted(
-                          result.member.remainingSessions ?? 0,
-                          result.member.totalSessions ?? 10
-                        )[language]}
+                      <div className="text-[11px] font-semibold text-[#1E40AF] flex items-center gap-1.5">
+                        <Ticket className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {tLabels.sessionDeducted(
+                            result.member.remainingSessions ?? 0,
+                            result.member.totalSessions ?? 10
+                          )[language]}
+                        </span>
                       </div>
                     )}
 
                     {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
-                      <div className="text-[11px] font-semibold text-[#D97706]">
-                        {tLabels.timeSlot(result.member.startTime, result.member.endTime)[language]}
+                      <div className="text-[11px] font-semibold text-[#D97706] flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {tLabels.timeSlot(result.member.startTime, result.member.endTime)[language]}
+                        </span>
                       </div>
                     )}
 
                     {result.member.hasDebt && result.member.balanceDue && (
-                      <div className="inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
-                        {tLabels.debtWarning(result.member.balanceDue)[language]}
+                      <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] nums">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{tLabels.debtWarning(result.member.balanceDue)[language]}</span>
                       </div>
                     )}
                   </div>
