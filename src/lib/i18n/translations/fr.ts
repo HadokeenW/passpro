@@ -92,6 +92,7 @@ export const fr: TranslationSchema = {
       SUBSCRIPTION_SUSPENDED: "Abonnement suspendu",
       SESSIONS_EXHAUSTED: "Séances épuisées (0 restante)",
       OUTSIDE_TIME_WINDOW: "Hors créneau horaire autorisé",
+      ANTI_PASSBACK: "Anti-passback : badge déjà utilisé",
     },
     memberDetails: {
       plan: "Formule",

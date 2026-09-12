@@ -248,6 +248,29 @@ export async function evaluateScan(
         }
       }
 
+      // Anti-Passback check for physical access terminals:
+      // If card was already granted entry within 5 minutes, deny access to stop card sharing.
+      if (decision === "GRANTED" && source === "HARDWARE") {
+        const fiveMinutesAgo = new Date(nowMs - 5 * 60 * 1000);
+        const recentPassage = await prisma.accessLog.findFirst({
+          where: {
+            cardUid: uid,
+            decision: "GRANTED",
+            createdAt: { gte: fiveMinutesAgo },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (recentPassage) {
+          decision = "DENIED";
+          reason = "ANTI_PASSBACK";
+          alertLevel = "WARNING";
+          alertType = "ANTI_PASSBACK";
+          alertTitle = "Anti-passback actif";
+          alertMsg = `Badge déjà utilisé récemment (${member.firstName} ${member.lastName}). Échange ou prêt de carte suspecté.`;
+        }
+      }
+
       // If granted and SESSIONS plan, decrement remainingSessions by 1
       let updatedRemainingSessions = sub.remainingSessions;
       if (decision === "GRANTED" && effectivePlanType === "SESSIONS" && sub.remainingSessions !== null && sub.remainingSessions > 0) {

@@ -128,7 +128,7 @@ export default function KioskPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto reset scan result after 1.8 seconds & hide popup (only if from background scan)
+  // Auto reset scan result after 3.8 seconds & hide popup (allows manager time to visually verify face/ID)
   useEffect(() => {
     if (!currentResult) return;
     const timer = setTimeout(() => {
@@ -137,7 +137,7 @@ export default function KioskPage() {
         (window as any).electronAPI?.hideKioskPopup?.();
       }
       isBackgroundScanRef.current = false;
-    }, 1800);
+    }, 3800);
     return () => clearTimeout(timer);
   }, [currentResult]);
 

@@ -623,11 +623,11 @@ async function triggerRfidPopup(scannedUid) {
       mainWindow.webContents.send("global-rfid-scan", payload);
     }
 
-    // Safety fallback: release topmost after 2.2 seconds if not dismissed sooner by frontend
+    // Safety fallback: release topmost after 4.2 seconds if not dismissed sooner by frontend
     if (popupHideTimer) clearTimeout(popupHideTimer);
     popupHideTimer = setTimeout(() => {
       hideKioskPopup();
-    }, 2200);
+    }, 4200);
   }
 }
 

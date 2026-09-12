@@ -92,6 +92,7 @@ export const en: TranslationSchema = {
       SUBSCRIPTION_SUSPENDED: "Subscription suspended",
       SESSIONS_EXHAUSTED: "Sessions exhausted (0 remaining)",
       OUTSIDE_TIME_WINDOW: "Outside permitted hours",
+      ANTI_PASSBACK: "Anti-passback: card already used",
     },
     memberDetails: {
       plan: "Plan",

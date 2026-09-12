@@ -125,6 +125,7 @@ export interface TranslationSchema {
       SUBSCRIPTION_SUSPENDED: string;
       SESSIONS_EXHAUSTED: string;
       OUTSIDE_TIME_WINDOW: string;
+      ANTI_PASSBACK: string;
     };
     memberDetails: {
       plan: string;

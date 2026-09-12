@@ -64,6 +64,7 @@ export const QuickScanWidget: React.FC = () => {
       NO_ACTIVE_SUBSCRIPTION: { fr: "Aucun abonnement actif", en: "No active subscription", ar: "لا يوجد اشتراك نشط" },
       SUBSCRIPTION_EXPIRED: { fr: "Abonnement expiré", en: "Subscription expired", ar: "اشتراك منتهي الصلاحية" },
       SUBSCRIPTION_SUSPENDED: { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
+      ANTI_PASSBACK: { fr: "Anti-passback : badge déjà utilisé", en: "Anti-passback: card already used", ar: "منع تمرير البطاقة: استخدمت مؤخراً" },
       OK: { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
     };
     return map[reason]?.[language] || reason;

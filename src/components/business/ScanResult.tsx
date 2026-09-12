@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, X, AlertTriangle, Ticket, Clock } from "lucide-react";
+import { Check, X, AlertTriangle, Ticket, Clock, UserX, CameraOff } from "lucide-react";
 import { ScanResult as ScanResultType } from "@/server/services/access-engine";
 import { formatDate, toLatinDigits } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
@@ -38,6 +38,7 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
       SUBSCRIPTION_SUSPENDED: { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
       SESSIONS_EXHAUSTED: { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
       OUTSIDE_TIME_WINDOW: { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      ANTI_PASSBACK: { fr: "Anti-passback : badge déjà utilisé", en: "Anti-passback: card already used", ar: "منع تمرير البطاقة: استخدمت مؤخراً" },
       OK: { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
       "Badge non reconnu": { fr: "Badge non reconnu", en: "Card not recognized", ar: "بطاقة غير معروفة" },
       "Badge bloqué": { fr: "Badge bloqué", en: "Card blocked", ar: "بطاقة محظورة" },
@@ -47,6 +48,7 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
       "Abonnement suspendu": { fr: "Abonnement suspendu", en: "Subscription suspended", ar: "اشتراك موقوف مؤقتاً" },
       "Séances épuisées (0 restante)": { fr: "Séances épuisées (0 restante)", en: "Sessions exhausted (0 remaining)", ar: "استنفدت الحصص (0 متبقية)" },
       "Hors créneau horaire autorisé": { fr: "Hors créneau horaire autorisé", en: "Outside permitted time slot", ar: "خارج الفترة الزمنية المسموح بها" },
+      "Anti-passback : badge déjà utilisé": { fr: "Anti-passback : badge déjà utilisé", en: "Anti-passback: card already used", ar: "منع تمرير البطاقة: استخدمت مؤخراً" },
       "Accès autorisé": { fr: "Accès autorisé", en: "Access granted", ar: "تم السماح بالدخول" },
     };
 
@@ -76,9 +78,9 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
       className="fixed inset-0 z-50 flex flex-col items-center justify-center p-8 text-white select-none cursor-pointer animate-in fade-in zoom-in-[0.96] duration-400"
       style={{ background }}
     >
-      {/* Central Circle: Member photo if available, otherwise check/alert/x icon */}
+      {/* Central Circle: Member photo if available, otherwise check/alert/x/userX icon */}
       <div className="relative mb-6">
-        <div className="w-36 h-36 rounded-full border-4 border-white/50 overflow-hidden shadow-2xl flex items-center justify-center bg-white/10 backdrop-blur-sm">
+        <div className="w-44 h-44 md:w-52 md:h-52 rounded-full border-4 border-white/60 overflow-hidden shadow-2xl flex items-center justify-center bg-white/15 backdrop-blur-md">
           {result.member?.photoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -91,30 +93,43 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
           ) : isExpiringSoon ? (
             <AlertTriangle className="w-24 h-24 text-white stroke-[2.5]" />
           ) : (
-            <Check className="w-24 h-24 text-white stroke-[2.5]" />
+            <div className="flex flex-col items-center justify-center text-white/90">
+              <UserX className="w-20 h-20 stroke-[1.8]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider mt-1 opacity-90">
+                {forceFrench
+                  ? "Sans photo"
+                  : effectiveLang === "ar"
+                  ? "بدون صورة"
+                  : effectiveLang === "en"
+                  ? "No Photo"
+                  : "Sans photo"}
+              </span>
+            </div>
           )}
         </div>
 
         {/* Status Badge overlay */}
-        {result.member?.photoUrl && (
-          <div
-            className={`absolute bottom-0 right-0 w-11 h-11 rounded-full flex items-center justify-center border-2 border-white shadow-lg ${
-              !isGranted
-                ? "bg-[#DC2626]"
-                : isExpiringSoon
-                ? "bg-[#D97706]"
-                : "bg-[#059669]"
-            }`}
-          >
-            {!isGranted ? (
-              <X className="w-6 h-6 text-white stroke-[3]" />
-            ) : isExpiringSoon ? (
-              <AlertTriangle className="w-6 h-6 text-white stroke-[2.5]" />
-            ) : (
-              <Check className="w-6 h-6 text-white stroke-[3]" />
-            )}
-          </div>
-        )}
+        <div
+          className={`absolute bottom-1 right-1 w-12 h-12 rounded-full flex items-center justify-center border-2 border-white shadow-lg ${
+            !isGranted
+              ? "bg-[#DC2626]"
+              : !result.member?.photoUrl
+              ? "bg-[#D97706]"
+              : isExpiringSoon
+              ? "bg-[#D97706]"
+              : "bg-[#059669]"
+          }`}
+        >
+          {!isGranted ? (
+            <X className="w-6 h-6 text-white stroke-[3]" />
+          ) : !result.member?.photoUrl ? (
+            <AlertTriangle className="w-6 h-6 text-white stroke-[2.5]" />
+          ) : isExpiringSoon ? (
+            <AlertTriangle className="w-6 h-6 text-white stroke-[2.5]" />
+          ) : (
+            <Check className="w-6 h-6 text-white stroke-[3]" />
+          )}
+        </div>
       </div>
 
       {/* Decision Big Heading */}
@@ -132,69 +147,105 @@ export const ScanResultView: React.FC<ScanResultViewProps> = ({
           : t("kiosk.scanGranted")}
       </div>
 
-      {isGranted && result.member ? (
+      {result.member ? (
         <div className="flex flex-col items-center text-center max-w-2xl">
+          {/* Visual ID verification pill or missing photo alert */}
+          {result.member.photoUrl ? (
+            <div className="mb-2 px-4 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-[12px] md:text-[13px] font-semibold tracking-wider uppercase text-white/90">
+              {forceFrench
+                ? "Contrôle visuel adhérent"
+                : effectiveLang === "ar"
+                ? "التحقق البصري من المشترك"
+                : effectiveLang === "en"
+                ? "Visual ID Verification"
+                : "Contrôle visuel adhérent"}
+            </div>
+          ) : (
+            <div className="mb-3 px-5 py-2 rounded-full bg-amber-500/90 text-white border-2 border-white shadow-xl flex items-center gap-2 font-bold text-[14px] md:text-[16px] animate-pulse">
+              <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+              <span>
+                {forceFrench
+                  ? "PHOTO MANQUANTE · VÉRIFIER LA PIÈCE D'IDENTITÉ"
+                  : effectiveLang === "ar"
+                  ? "صورة غير مسجلة · يرجى التحقق من بطاقة الهوية"
+                  : effectiveLang === "en"
+                  ? "NO PHOTO ON FILE · VERIFY IDENTITY CARD"
+                  : "PHOTO MANQUANTE · VÉRIFIER LA PIÈCE D'IDENTITÉ"}
+              </span>
+            </div>
+          )}
+
           {/* Member Name */}
           <h1 className="text-[38px] md:text-[50px] font-bold uppercase tracking-tight text-white mb-2 leading-tight">
             {result.member.firstName} {result.member.lastName}
           </h1>
 
-          {/* Plan Name */}
-          <div className="text-[20px] md:text-[24px] text-white/90 font-medium mb-3">
-            {result.member.planName}
-          </div>
+          {/* Reason if Denied (e.g. Anti-Passback or Suspended or Expired) */}
+          {!isGranted ? (
+            <div className="mb-4 px-6 py-2.5 rounded-full bg-black/40 text-white border-2 border-white/60 shadow-xl flex items-center gap-2.5 font-bold text-[17px] md:text-[20px]">
+              <X className="w-5 h-5 text-red-400 shrink-0" />
+              <span>{getReasonLabel(result.reason)}</span>
+            </div>
+          ) : (
+            <>
+              {/* Plan Name */}
+              <div className="text-[20px] md:text-[24px] text-white/90 font-medium mb-3">
+                {result.member.planName}
+              </div>
 
-          {/* Special notices (Debt / Sessions / Time slot) */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
-            {result.member.hasDebt && result.member.balanceDue && (
-              <div className="bg-red-600/90 text-white font-bold px-5 py-2 rounded-full border-2 border-white shadow-lg text-[16px] nums flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+              {/* Special notices (Debt / Sessions / Time slot) */}
+              <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+                {result.member.hasDebt && result.member.balanceDue && (
+                  <div className="bg-red-600/90 text-white font-bold px-5 py-2 rounded-full border-2 border-white shadow-lg text-[16px] nums flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+                    <span>
+                      {forceFrench ? "Dette en cours" : t("kiosk.memberDetails.debtAlert")} : {formatMoney(result.member.balanceDue)}
+                    </span>
+                  </div>
+                )}
+
+                {result.member.planType === "SESSIONS" && (
+                  <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
+                    <Ticket className="w-4 h-4 shrink-0" />
+                    <span>
+                      {toLatinDigits(String(result.member.remainingSessions ?? 0))} {forceFrench ? "séance(s) restante(s)" : t("kiosk.memberDetails.sessionsRemaining")}
+                    </span>
+                  </div>
+                )}
+
+                {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
+                  <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
+                    <Clock className="w-4 h-4 shrink-0" />
+                    <span>
+                      {toLatinDigits(result.member.startTime)} - {toLatinDigits(result.member.endTime)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Validity Pill */}
+              <div
+                className={`backdrop-blur-md border px-6 py-2.5 rounded-full text-[16px] md:text-[18px] font-semibold text-white tracking-wide shadow-lg nums flex items-center gap-2 ${
+                  isExpiringSoon
+                    ? "bg-black/25 border-white/40"
+                    : "bg-white/20 border-white/30"
+                }`}
+              >
+                {isExpiringSoon && <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0" />}
                 <span>
-                  {forceFrench ? "Dette en cours" : t("kiosk.memberDetails.debtAlert")} : {formatMoney(result.member.balanceDue)}
+                  {forceFrench ? "Valable jusqu'au" : t("kiosk.memberDetails.validUntil")} :{" "}
+                  {formatDate(result.member.endDate, "Africa/Algiers", forceFrench ? "fr" : effectiveLang)} · {toLatinDigits(String(result.member.daysRemaining))}{" "}
+                  {result.member.daysRemaining > 1
+                    ? forceFrench
+                      ? "jours restants"
+                      : t("kiosk.memberDetails.daysLeftPlural")
+                    : forceFrench
+                    ? "jour restant"
+                    : t("kiosk.memberDetails.daysLeftSingular")}
                 </span>
               </div>
-            )}
-
-            {result.member.planType === "SESSIONS" && (
-              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
-                <Ticket className="w-4 h-4 shrink-0" />
-                <span>
-                  {toLatinDigits(String(result.member.remainingSessions ?? 0))} {forceFrench ? "séance(s) restante(s)" : t("kiosk.memberDetails.sessionsRemaining")}
-                </span>
-              </div>
-            )}
-
-            {result.member.planType === "TIME_SLOT" && result.member.startTime && result.member.endTime && (
-              <div className="bg-white/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/30 text-[16px] font-semibold text-white nums flex items-center gap-2">
-                <Clock className="w-4 h-4 shrink-0" />
-                <span>
-                  {toLatinDigits(result.member.startTime)} - {toLatinDigits(result.member.endTime)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Validity Pill */}
-          <div
-            className={`backdrop-blur-md border px-6 py-2.5 rounded-full text-[16px] md:text-[18px] font-semibold text-white tracking-wide shadow-lg nums flex items-center gap-2 ${
-              isExpiringSoon
-                ? "bg-black/25 border-white/40"
-                : "bg-white/20 border-white/30"
-            }`}
-          >
-            {isExpiringSoon && <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0" />}
-            <span>
-              {forceFrench ? "Valable jusqu'au" : t("kiosk.memberDetails.validUntil")} :{" "}
-              {formatDate(result.member.endDate, "Africa/Algiers", forceFrench ? "fr" : effectiveLang)} · {toLatinDigits(String(result.member.daysRemaining))}{" "}
-              {result.member.daysRemaining > 1
-                ? forceFrench
-                  ? "jours restants"
-                  : t("kiosk.memberDetails.daysLeftPlural")
-                : forceFrench
-                ? "jour restant"
-                : t("kiosk.memberDetails.daysLeftSingular")}
-            </span>
-          </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center text-center max-w-xl">

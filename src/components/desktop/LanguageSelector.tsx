@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation, SUPPORTED_LANGUAGES, Language } from "@/lib/i18n";
-import { Globe, Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 
 interface LanguageSelectorProps {
   variant?: "compact" | "pills" | "dropdown";
@@ -84,18 +84,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         title="Changer de langue / Change language / تغيير اللغة"
-        className={`flex items-center gap-1.5 px-2 py-1 rounded-[6px] text-[11.5px] font-medium transition-colors cursor-pointer select-none ${
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] text-[11.5px] font-medium transition-colors cursor-pointer select-none ${
           isDark
             ? "text-white/80 hover:text-white hover:bg-white/10 border border-white/10"
             : "text-[#475569] hover:text-[#0F172A] hover:bg-slate-100 border border-slate-200"
         }`}
       >
-        <span className="text-xs leading-none">{currentLanguageInfo.flag}</span>
         <span className="font-semibold tracking-wide uppercase">
           {currentLanguageInfo.code}
         </span>
         <ChevronDown
-          className={`w-3 h-3 transition-transform duration-150 ${
+          className={`w-3.5 h-3.5 transition-transform duration-150 ${
             isOpen ? "rotate-180" : ""
           } ${isDark ? "text-white/50" : "text-slate-400"}`}
         />

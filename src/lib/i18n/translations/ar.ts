@@ -92,6 +92,7 @@ export const ar: TranslationSchema = {
       SUBSCRIPTION_SUSPENDED: "الاشتراك موقوف مؤقتاً",
       SESSIONS_EXHAUSTED: "تم استنفاد جميع الحصص (0 متبقية)",
       OUTSIDE_TIME_WINDOW: "خارج الأوقات المسموح بها",
+      ANTI_PASSBACK: "منع تمرير البطاقة: تم مسحها مؤخراً",
     },
     memberDetails: {
       plan: "الباقة",

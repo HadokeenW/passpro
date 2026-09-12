@@ -257,11 +257,10 @@ export default function LoginPage() {
                   key={idx}
                   type="button"
                   onClick={() => setCurrentSlide(idx)}
-                  className={`h-1.5 transition-all duration-300 rounded-full cursor-pointer ${
-                    currentSlide === idx
+                  className={`h-1.5 transition-all duration-300 rounded-full cursor-pointer ${currentSlide === idx
                       ? "w-6 bg-white shadow-sm"
                       : "w-1.5 bg-white/40 hover:bg-white/70"
-                  }`}
+                    }`}
                   aria-label={slide.badge}
                   title={slide.badge}
                 />
@@ -301,11 +300,10 @@ export default function LoginPage() {
                 {APP_SLIDES.map((slide, idx) => (
                   <div
                     key={idx}
-                    className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                      currentSlide === idx
+                    className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${currentSlide === idx
                         ? "opacity-100 z-10 pointer-events-auto"
                         : "opacity-0 z-0 pointer-events-none"
-                    }`}
+                      }`}
                   >
                     <img
                       src={slide.image}

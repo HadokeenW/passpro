@@ -233,4 +233,58 @@ describe("Access Engine Evaluation Matrix", () => {
     await prisma.subscription.deleteMany({ where: { memberId: member.id } });
     await prisma.member.delete({ where: { id: member.id } });
   });
+
+  it("Scenario 12: Anti-Passback blocks second HARDWARE scan of same card within 5 minutes", async () => {
+    const plan = await prisma.plan.findFirst({ where: { name: "Pass Journée" } });
+    const member = await prisma.member.create({
+      data: {
+        firstName: "TestAntiPassback",
+        lastName: "User",
+        phone: "0550000005",
+        subscriptions: {
+          create: {
+            planId: plan!.id,
+            planType: "TEMPORAL",
+            price: 5000,
+            paidAmount: 5000,
+            balanceDue: 0,
+            startDate: new Date(Date.now() - 3600 * 1000),
+            endDate: new Date(Date.now() + 30 * 86400 * 1000),
+            status: "ACTIVE",
+          },
+        },
+        cards: {
+          create: {
+            uid: "04:88:00:05",
+            status: "ACTIVE",
+          },
+        },
+      },
+    });
+
+    // Simulate entry logged 1 minute ago
+    await prisma.accessLog.create({
+      data: {
+        cardUid: "04:88:00:05",
+        memberId: member.id,
+        decision: "GRANTED",
+        reason: "OK",
+        source: "HARDWARE",
+        createdAt: new Date(Date.now() - 60 * 1000),
+      },
+    });
+
+    // Second hardware scan within 5 minutes -> Denied with ANTI_PASSBACK
+    const result = await evaluateScan("04:88:00:05", "HARDWARE");
+    expect(result.decision).toBe("DENIED");
+    expect(result.reason).toBe("ANTI_PASSBACK");
+    expect(result.member).not.toBeNull();
+    expect(result.member?.firstName).toBe("TestAntiPassback");
+
+    // Clean up
+    await prisma.accessLog.deleteMany({ where: { cardUid: "04:88:00:05" } });
+    await prisma.card.deleteMany({ where: { uid: "04:88:00:05" } });
+    await prisma.subscription.deleteMany({ where: { memberId: member.id } });
+    await prisma.member.delete({ where: { id: member.id } });
+  });
 });
