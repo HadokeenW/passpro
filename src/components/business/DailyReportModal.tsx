@@ -15,6 +15,7 @@ interface DailyReportModalProps {
     totalAmount: number;
     count: number;
     byMethod?: Record<string, { total: number; count: number }>;
+    byType?: Record<string, { total: number; count: number }>;
     byOperator?: Record<string, { total: number; count: number }>;
   } | null;
   periodLabel?: string;
@@ -50,6 +51,10 @@ export const DailyReportModal: React.FC<DailyReportModalProps> = ({
       en: `${c} transaction${c > 1 ? "s" : ""} processed`,
       ar: `${c} عملية مؤكدة`,
     }),
+    typeBreakdown: { fr: "Ventilation par activité", en: "Breakdown by Activity", ar: "التوزيع حسب النشاط" },
+    subsType: { fr: "Abonnements & Réinscriptions", en: "Memberships & Renewals", ar: "الاشتراكات والتجديدات" },
+    posType: { fr: "Vente Boutique & Buvette (Mini POS)", en: "POS Store & Snack Sales", ar: "مبيعات المحل والمشروبات (POS)" },
+    debtType: { fr: "Règlements de dettes", en: "Debt Settlements", ar: "تسديد الديون" },
     methodBreakdown: { fr: "Ventilation par mode de règlement", en: "Breakdown by Payment Method", ar: "التوزيع حسب وسيلة الدفع" },
     cash: { fr: "Espèces (Cash)", en: "Cash", ar: "نقداً" },
     card: { fr: "Carte bancaire (TPE)", en: "Card (POS)", ar: "بطاقة بنكية (TPE)" },
@@ -73,6 +78,9 @@ export const DailyReportModal: React.FC<DailyReportModalProps> = ({
   const cash = summary.byMethod?.["CASH"] || { total: 0, count: 0 };
   const card = summary.byMethod?.["CARD"] || { total: 0, count: 0 };
   const transfer = summary.byMethod?.["TRANSFER"] || { total: 0, count: 0 };
+  const subSales = summary.byType?.["SUBSCRIPTION"] || { total: 0, count: 0 };
+  const posSales = summary.byType?.["POS_SALE"] || { total: 0, count: 0 };
+  const debtSales = summary.byType?.["DEBT_PAYMENT"] || { total: 0, count: 0 };
   const operators = Object.entries(summary.byOperator || {});
 
   return (
@@ -123,6 +131,31 @@ export const DailyReportModal: React.FC<DailyReportModalProps> = ({
           </div>
           <div className="text-[12px] text-[#1E40AF] mt-1 font-medium">
             {tLabels.validatedTransactions(summary.count)[language]}
+          </div>
+        </div>
+
+        {/* Activity Breakdown (Abonnements vs Boutique POS) */}
+        <div>
+          <h4 className="text-[13px] font-bold uppercase tracking-wide text-[#64748B] mb-2">
+            {tLabels.typeBreakdown[language]}
+          </h4>
+          <div className="grid grid-cols-2 gap-2 text-[12px]">
+            <div className="p-2.5 rounded-[6px] border border-[#E2E8F0] bg-[#F8FAFC]">
+              <span className="text-[#64748B] block text-[11px] font-medium">{tLabels.subsType[language]}</span>
+              <span className="text-[14px] font-bold text-[#0F172A] nums mt-0.5 block">{formatMoney(subSales.total)}</span>
+              <span className="text-[10.5px] text-[#94A3B8]">{subSales.count} {language === "ar" ? "عملية" : "ventes"}</span>
+            </div>
+            <div className="p-2.5 rounded-[6px] border border-[#DBEAFE] bg-[#EFF6FF]">
+              <span className="text-[#1D4ED8] block text-[11px] font-semibold">{tLabels.posType[language]}</span>
+              <span className="text-[14px] font-bold text-[#1E40AF] nums mt-0.5 block">{formatMoney(posSales.total)}</span>
+              <span className="text-[10.5px] text-[#3B82F6]">{posSales.count} {language === "ar" ? "عملية" : "ventes"}</span>
+            </div>
+            {debtSales.total > 0 && (
+              <div className="col-span-2 p-2 rounded-[6px] border border-[#FEF3C7] bg-[#FFFBEB] flex justify-between items-center text-[11px]">
+                <span className="text-[#B45309] font-medium">{tLabels.debtType[language]}</span>
+                <span className="font-bold text-[#92400E] nums">{formatMoney(debtSales.total)} ({debtSales.count})</span>
+              </div>
+            )}
           </div>
         </div>
 

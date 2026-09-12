@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { errorResponse, ApiError } from "@/lib/errors";
-import { processPayment } from "@/server/services/payments";
+import { processPayment, processPosSale } from "@/server/services/payments";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const period = searchParams.get("period") || "today";
     const memberId = searchParams.get("memberId");
+    const paymentType = searchParams.get("paymentType");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10)));
 
@@ -19,6 +20,10 @@ export async function GET(req: NextRequest) {
 
     if (memberId) {
       where.memberId = memberId;
+    }
+
+    if (paymentType) {
+      where.paymentType = paymentType;
     }
 
     if (period === "today") {
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest) {
         select: {
           amount: true,
           method: true,
+          paymentType: true,
           operator: { select: { name: true } },
         },
       }),
@@ -65,6 +71,11 @@ export async function GET(req: NextRequest) {
               endDate: true,
             },
           },
+          items: {
+            include: {
+              product: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -80,13 +91,24 @@ export async function GET(req: NextRequest) {
       CARD: { total: 0, count: 0 },
       OTHER: { total: 0, count: 0 },
     };
+    const byType: Record<string, { total: number; count: number }> = {
+      SUBSCRIPTION: { total: 0, count: 0 },
+      POS_SALE: { total: 0, count: 0 },
+      DEBT_PAYMENT: { total: 0, count: 0 },
+    };
     const byOperator: Record<string, { total: number; count: number }> = {};
 
     for (const p of allMatching) {
       totalAmount += p.amount;
+
       if (!byMethod[p.method]) byMethod[p.method] = { total: 0, count: 0 };
       byMethod[p.method].total += p.amount;
       byMethod[p.method].count += 1;
+
+      const pType = p.paymentType || "SUBSCRIPTION";
+      if (!byType[pType]) byType[pType] = { total: 0, count: 0 };
+      byType[pType].total += p.amount;
+      byType[pType].count += 1;
 
       const opName = p.operator?.name || "Inconnu";
       if (!byOperator[opName]) byOperator[opName] = { total: 0, count: 0 };
@@ -104,6 +126,7 @@ export async function GET(req: NextRequest) {
         totalAmount,
         count,
         byMethod,
+        byType,
         byOperator,
       },
     });
@@ -116,6 +139,20 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireRole(["ADMIN", "MANAGER", "RECEPTIONIST"]);
     const body = await req.json();
+
+    // Check if this is a POS itemized sale
+    if (body.paymentType === "POS_SALE" || (Array.isArray(body.items) && body.items.length > 0)) {
+      const { items, method, memberId, receivedAmount } = body;
+      const payment = await processPosSale({
+        items,
+        method,
+        memberId: memberId || null,
+        operatorId: user.id,
+        receivedAmount,
+      });
+      return NextResponse.json(payment, { status: 201 });
+    }
+
     const { memberId, planId, subscriptionId, mode, method, customAmount, totalPrice, isDebtSettlement } = body;
 
     if (!memberId) {

@@ -20,11 +20,11 @@ interface ReceiptModalProps {
       method: string;
       planName: string;
       createdAt: string;
-      member: {
+      member?: {
         firstName: string;
         lastName: string;
         phone?: string | null;
-      };
+      } | null;
       operator?: {
         name: string;
       } | null;
@@ -32,6 +32,13 @@ interface ReceiptModalProps {
         startDate: string;
         endDate: string;
       } | null;
+      items?: {
+        id: string;
+        name: string;
+        unitPrice: number;
+        quantity: number;
+        totalPrice: number;
+      }[];
     };
     setting?: {
       gymName: string;
@@ -99,9 +106,14 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     tel: { fr: "Tél :", en: "Tel:", ar: "هاتف:" },
     receiptNo: { fr: "N° REÇU :", en: "RECEIPT #:", ar: "رقم الوصل:" },
     date: { fr: "DATE :", en: "DATE:", ar: "التاريخ:" },
-    member: { fr: "ADHÉRENT :", en: "MEMBER:", ar: "المشترك:" },
+    member: { fr: "CLIENT :", en: "CUSTOMER:", ar: "الزبون:" },
+    walkIn: { fr: "Client comptoir", en: "Walk-in Customer", ar: "زبون عابر" },
     period: { fr: "Période :", en: "Period:", ar: "الفترة:" },
     to: { fr: "au", en: "to", ar: "إلى" },
+    qtyCol: { fr: "Qté", en: "Qty", ar: "الكمية" },
+    itemCol: { fr: "Désignation", en: "Item", ar: "البيان" },
+    puCol: { fr: "P.U", en: "U.P", ar: "الوحدة" },
+    totalCol: { fr: "Total", en: "Total", ar: "الإجمالي" },
     planPrice: { fr: "Prix formule :", en: "Plan Price:", ar: "سعر الاشتراك:" },
     totalPaid: { fr: "TOTAL RÉGLÉ", en: "TOTAL PAID", ar: "المجموع المدفوع" },
     remainingDue: { fr: "RESTE À PAYER :", en: "BALANCE DUE:", ar: "المتبقي للدفع:" },
@@ -177,31 +189,50 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-[#64748B]">{tLabels.member[language]}</span>
             <span className="font-semibold text-[#0F172A] truncate max-w-[170px]">
-              {payment.member.firstName} {payment.member.lastName}
+              {payment.member ? `${payment.member.firstName} ${payment.member.lastName}` : tLabels.walkIn[language]}
             </span>
           </div>
 
           <div className="border-t border-dashed border-[#CBD5E1] my-1" />
 
-          {/* Subscription details */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-center font-semibold text-[13px]">
-              <span>{payment.planName}</span>
-              <span className="nums font-bold">
-                {formatMoney(payment.amount, setting?.currency || "DA")}
-              </span>
+          {/* Product Items or Subscription details */}
+          {payment.items && payment.items.length > 0 ? (
+            <div className="flex flex-col gap-1.5 text-[11px]">
+              <div className="flex justify-between font-bold text-[#64748B] border-b border-[#E2E8F0] pb-1">
+                <span className="w-8">{tLabels.qtyCol[language]}</span>
+                <span className="flex-1 text-left rtl:text-right px-1">{tLabels.itemCol[language]}</span>
+                <span className="w-12 text-right">{tLabels.puCol[language]}</span>
+                <span className="w-14 text-right">{tLabels.totalCol[language]}</span>
+              </div>
+              {payment.items.map((it) => (
+                <div key={it.id} className="flex justify-between items-center text-[#0F172A]">
+                  <span className="w-8 font-semibold text-[#64748B] nums">{it.quantity}x</span>
+                  <span className="flex-1 text-left rtl:text-right px-1 truncate font-medium">{it.name}</span>
+                  <span className="w-12 text-right nums text-[#64748B]">{it.unitPrice}</span>
+                  <span className="w-14 text-right nums font-semibold">{it.totalPrice}</span>
+                </div>
+              ))}
             </div>
-
-            {payment.subscription && (
-              <div className="text-[11px] text-[#64748B] flex justify-between">
-                <span>{tLabels.period[language]}</span>
-                <span>
-                  {formatDate(payment.subscription.startDate)} {tLabels.to[language]}{" "}
-                  {formatDate(payment.subscription.endDate)}
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center font-semibold text-[13px]">
+                <span>{payment.planName}</span>
+                <span className="nums font-bold">
+                  {formatMoney(payment.amount, setting?.currency || "DA")}
                 </span>
               </div>
-            )}
-          </div>
+
+              {payment.subscription && (
+                <div className="text-[11px] text-[#64748B] flex justify-between">
+                  <span>{tLabels.period[language]}</span>
+                  <span>
+                    {formatDate(payment.subscription.startDate)} {tLabels.to[language]}{" "}
+                    {formatDate(payment.subscription.endDate)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="border-t-2 border-[#0F172A] my-1" />
 

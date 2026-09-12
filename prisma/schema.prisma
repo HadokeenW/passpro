@@ -173,8 +173,8 @@ enum PaymentMethod {
 model Payment {
   id               String        @id @default(cuid())
   receiptNumber    String        @unique
-  member           Member        @relation(fields: [memberId], references: [id])
-  memberId         String
+  member           Member?       @relation(fields: [memberId], references: [id])
+  memberId         String?
   subscription     Subscription? @relation(fields: [subscriptionId], references: [id])
   subscriptionId   String?
   plan             Plan?         @relation(fields: [planId], references: [id])
@@ -187,9 +187,48 @@ model Payment {
   method           PaymentMethod @default(CASH)
   operator         User?         @relation(fields: [operatorId], references: [id])
   operatorId       String?
+  items            PaymentItem[]
   createdAt        DateTime      @default(now())
 
   @@index([createdAt])
+  @@index([memberId])
+  @@index([paymentType])
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  name          String
+  category      String        @default("BOISSONS") // "BOISSONS", "PROTEINES", "SNACKS", "COMPLEMENTS", "ACCESSOIRES"
+  price         Int
+  costPrice     Int?
+  stock         Int           @default(0)
+  minStockAlert Int           @default(5)
+  barcode       String?
+  image         String?
+  icon          String?
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         PaymentItem[]
+
+  @@index([category])
+  @@index([active])
+  @@index([barcode])
+}
+
+model PaymentItem {
+  id         String   @id @default(cuid())
+  payment    Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId  String
+  product    Product? @relation(fields: [productId], references: [id])
+  productId  String?
+  name       String
+  unitPrice  Int
+  quantity   Int      @default(1)
+  totalPrice Int
+
+  @@index([paymentId])
+  @@index([productId])
 }
 
 model Counter {

@@ -77,6 +77,7 @@ export interface TranslationSchema {
     deleteAll: string;
     noNotifications: string;
     profile: string;
+    help: string;
     logout: string;
     searchPlaceholder: string;
   };
@@ -89,6 +90,7 @@ export interface TranslationSchema {
     cards: string;
     payments: string;
     accessLogs: string;
+    help: string;
     settings: string;
   };
   titleBar: {
@@ -366,5 +368,53 @@ export interface TranslationSchema {
     loggingIn: string;
     rememberMe: string;
     demoAccounts: string;
+  };
+  pos: {
+    title: string;
+    subtitle: string;
+    tabs: {
+      pos: string;
+      journal: string;
+      products: string;
+    };
+    categories: {
+      all: string;
+      drinks: string;
+      proteins: string;
+      supplements: string;
+      accessories: string;
+      other: string;
+    };
+    searchPlaceholder: string;
+    inStock: string;
+    lowStock: string;
+    outOfStock: string;
+    cartTitle: string;
+    emptyCart: string;
+    emptyCartHint: string;
+    walkInCustomer: string;
+    selectMember: string;
+    searchMember: string;
+    total: string;
+    itemsCount: string;
+    quickCash: string;
+    exact: string;
+    changeDue: string;
+    received: string;
+    checkout: string;
+    checkoutSuccess: string;
+    newProduct: string;
+    editProduct: string;
+    productName: string;
+    category: string;
+    price: string;
+    costPrice: string;
+    stock: string;
+    stockAlert: string;
+    barcode: string;
+    icon: string;
+    saveProduct: string;
+    addStock: string;
+    stockCount: string;
   };
 }

@@ -154,6 +154,7 @@ describe("Access Engine Evaluation Matrix", () => {
   });
 
   it("Scenario 10: Time-slot subscription outside permitted window -> DENIED (OUTSIDE_TIME_WINDOW)", async () => {
+    await prisma.card.deleteMany({ where: { uid: "04:88:00:03" } });
     const plan = await prisma.plan.findFirst({ where: { name: "Pass Journée" } });
     // Define a window that is definitely not now (e.g. 02:00 to 03:00 am)
     const member = await prisma.member.create({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { processPayment } from "@/server/services/payments";
+import { processPayment, processPosSale } from "@/server/services/payments";
 import { prisma } from "@/lib/db";
 
 describe("Cashier and Payment Transaction", () => {
@@ -122,5 +122,81 @@ describe("Cashier and Payment Transaction", () => {
     await prisma.payment.deleteMany({ where: { memberId: member!.id } });
     await prisma.subscription.deleteMany({ where: { memberId: member!.id } });
     await prisma.member.delete({ where: { id: member!.id } });
+  });
+
+  it("processes POS sale for walk-in customer, creates items and decrements stock", async () => {
+    // 1. Create a test product
+    const product = await prisma.product.create({
+      data: {
+        name: "Test Protein Bar",
+        category: "PROTEINES",
+        price: 250,
+        stock: 20,
+        minStockAlert: 5,
+        active: true,
+      },
+    });
+
+    // 2. Perform POS sale of 3 units without member (client comptoir)
+    const sale = await processPosSale({
+      items: [
+        {
+          productId: product.id,
+          name: product.name,
+          unitPrice: product.price,
+          quantity: 3,
+        },
+      ],
+      method: "CASH",
+      memberId: null,
+    });
+
+    expect(sale.paymentType).toBe("POS_SALE");
+    expect(sale.amount).toBe(750);
+    expect(sale.memberId).toBeNull();
+    expect(sale.items).toHaveLength(1);
+    expect(sale.items[0].quantity).toBe(3);
+    expect(sale.items[0].totalPrice).toBe(750);
+
+    // 3. Verify product stock was decremented from 20 to 17
+    const updatedProd = await prisma.product.findUnique({
+      where: { id: product.id },
+    });
+    expect(updatedProd!.stock).toBe(17);
+
+    // Clean up
+    await prisma.paymentItem.deleteMany({ where: { paymentId: sale.id } });
+    await prisma.payment.delete({ where: { id: sale.id } });
+    await prisma.product.delete({ where: { id: product.id } });
+  });
+
+  it("prevents POS sale when requested quantity exceeds available stock", async () => {
+    const product = await prisma.product.create({
+      data: {
+        name: "Test Energy Drink",
+        category: "BOISSONS",
+        price: 200,
+        stock: 2,
+        active: true,
+      },
+    });
+
+    // Try to buy 5 when only 2 are in stock
+    await expect(
+      processPosSale({
+        items: [
+          {
+            productId: product.id,
+            name: product.name,
+            unitPrice: product.price,
+            quantity: 5,
+          },
+        ],
+        method: "CASH",
+      })
+    ).rejects.toThrow(/Stock insuffisant/);
+
+    // Clean up
+    await prisma.product.delete({ where: { id: product.id } });
   });
 });

@@ -28,6 +28,7 @@ import {
   Shield,
   Clock,
   ArrowRight,
+  HelpCircle,
 } from "lucide-react";
 
 import { getCachedData, setCachedData, prewarmRoute, prewarmAllCoreRoutes } from "@/lib/cache";
@@ -530,6 +531,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith("/cards")) return t("breadcrumbs.cards");
     if (pathname.startsWith("/payments")) return t("breadcrumbs.payments");
     if (pathname.startsWith("/access-logs")) return t("breadcrumbs.accessLogs");
+    if (pathname.startsWith("/help")) return t("breadcrumbs.help");
     if (pathname.startsWith("/settings")) return t("breadcrumbs.settings");
     return "PASSPro";
   };
@@ -1205,6 +1207,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <ScanLine className="w-4 h-4 text-[#64748B]" />
                         <span>{t("nav.kiosk")}</span>
                       </Link>
+
+                      <Link
+                        href="/help"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-medium text-[#475569] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
+                      >
+                        <HelpCircle className="w-4 h-4 text-[#2563EB]" />
+                        <span>{t("nav.help")}</span>
+                      </Link>
+
                       {user.role !== "RECEPTIONIST" && (
                         <Link
                           href="/settings"

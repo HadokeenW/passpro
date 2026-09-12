@@ -472,6 +472,36 @@ async function main() {
     }
   }
 
+  // 9. Products for POS (Boissons, Nutrition, Compléments, Accessoires)
+  const productsData = [
+    { name: "Eau Minérale 0.5L", category: "BOISSONS", price: 50, costPrice: 25, stock: 48, minStockAlert: 10, image: "/products/water.jpg", icon: "💧", barcode: "613000000001" },
+    { name: "Eau Minérale 1.5L", category: "BOISSONS", price: 80, costPrice: 40, stock: 36, minStockAlert: 10, image: "/products/water.jpg", icon: "💧", barcode: "613000000002" },
+    { name: "Boisson Énergisante (Red Bull)", category: "BOISSONS", price: 250, costPrice: 180, stock: 24, minStockAlert: 5, image: "/products/energy_drink.jpg", icon: "⚡", barcode: "613000000003" },
+    { name: "Boisson Isotonique 500ml", category: "BOISSONS", price: 200, costPrice: 130, stock: 18, minStockAlert: 5, image: "/products/isotonic_drink.jpg", icon: "🥤", barcode: "613000000004" },
+    { name: "Barre Protéinée Chocolat 50g", category: "PROTEINES", price: 250, costPrice: 160, stock: 30, minStockAlert: 8, image: "/products/protein_bar.jpg", icon: "🍫", barcode: "613000000005" },
+    { name: "Barre Protéinée Caramel / Fruits", category: "PROTEINES", price: 250, costPrice: 160, stock: 25, minStockAlert: 8, image: "/products/protein_bar.jpg", icon: "🥜", barcode: "613000000006" },
+    { name: "Cookie Protéiné 60g", category: "PROTEINES", price: 300, costPrice: 190, stock: 15, minStockAlert: 5, image: "/products/cookie_protein.jpg", icon: "🍪", barcode: "613000000007" },
+    { name: "Shaker Whey Isolate (Dose 30g)", category: "COMPLEMENTS", price: 350, costPrice: 200, stock: 40, minStockAlert: 10, image: "/products/whey_shaker.jpg", icon: "🥛", barcode: "613000000008" },
+    { name: "Dose Pre-Workout Booster", category: "COMPLEMENTS", price: 200, costPrice: 110, stock: 30, minStockAlert: 8, image: "/products/preworkout.jpg", icon: "🔥", barcode: "613000000009" },
+    { name: "Dose BCAA Énergie", category: "COMPLEMENTS", price: 150, costPrice: 80, stock: 25, minStockAlert: 5, image: "/products/preworkout.jpg", icon: "🍋", barcode: "613000000010" },
+    { name: "Serviette Microfibre PASSPro", category: "ACCESSOIRES", price: 500, costPrice: 280, stock: 12, minStockAlert: 3, image: "/products/gym_towel.jpg", icon: "🧘", barcode: "613000000011" },
+    { name: "Cadenas à Code Vestiaire", category: "ACCESSOIRES", price: 400, costPrice: 200, stock: 15, minStockAlert: 4, image: "/products/padlock.jpg", icon: "🔒", barcode: "613000000012" },
+    { name: "Shaker PASSPro 700ml", category: "ACCESSOIRES", price: 600, costPrice: 320, stock: 10, minStockAlert: 3, image: "/products/whey_shaker.jpg", icon: "🍼", barcode: "613000000013" },
+    { name: "Sangles de Tirage Gym", category: "ACCESSOIRES", price: 800, costPrice: 450, stock: 8, minStockAlert: 2, image: "/products/lifting_straps.jpg", icon: "🏋️", barcode: "613000000014" },
+  ];
+
+  for (const prod of productsData) {
+    const existing = await prisma.product.findFirst({ where: { name: prod.name } });
+    if (existing) {
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: prod,
+      });
+    } else {
+      await prisma.product.create({ data: prod });
+    }
+  }
+
   console.log("Seeding completed successfully with WAL mode!");
 }
 

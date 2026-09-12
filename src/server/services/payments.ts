@@ -249,6 +249,171 @@ export async function processPayment({
   return payment;
 }
 
+export interface PosSaleItemParam {
+  productId?: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+}
+
+export interface ProcessPosSaleParams {
+  items: PosSaleItemParam[];
+  method?: PaymentMethod;
+  memberId?: string | null;
+  operatorId?: string | null;
+  receivedAmount?: number;
+}
+
+export async function processPosSale({
+  items,
+  method = "CASH",
+  memberId,
+  operatorId,
+}: ProcessPosSaleParams) {
+  if (!items || items.length === 0) {
+    throw new ApiError("VALIDATION_ERROR", "Le panier est vide", 400);
+  }
+
+  const currentYear = new Date().getFullYear();
+  const counterKey = `receipt-${currentYear}`;
+
+  const payment = await prisma.$transaction(async (tx) => {
+    // 1. Verify Member if provided
+    let member = null;
+    if (memberId) {
+      member = await tx.member.findUnique({
+        where: { id: memberId },
+      });
+      if (!member) {
+        throw new ApiError("NOT_FOUND", "Adhérent introuvable", 404);
+      }
+    }
+
+    // 2. Calculate total and verify/decrement stock
+    let calculatedTotal = 0;
+    const validatedItems: {
+      productId?: string | null;
+      name: string;
+      unitPrice: number;
+      quantity: number;
+      totalPrice: number;
+    }[] = [];
+
+    for (const item of items) {
+      if (item.quantity <= 0) {
+        throw new ApiError("VALIDATION_ERROR", `Quantité invalide pour ${item.name}`, 400);
+      }
+
+      let productName = item.name;
+      let unitPrice = item.unitPrice;
+
+      if (item.productId) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+        });
+
+        if (!product || !product.active) {
+          throw new ApiError("NOT_FOUND", `Produit introuvable ou inactif : ${item.name}`, 404);
+        }
+
+        // Check stock
+        if (product.stock < item.quantity) {
+          throw new ApiError(
+            "BAD_REQUEST",
+            `Stock insuffisant pour "${product.name}" (${product.stock} restant(s))`,
+            400
+          );
+        }
+
+        // Decrement stock
+        await tx.product.update({
+          where: { id: product.id },
+          data: { stock: { decrement: item.quantity } },
+        });
+
+        productName = product.name;
+        unitPrice = product.price;
+      }
+
+      const itemTotal = unitPrice * item.quantity;
+      calculatedTotal += itemTotal;
+      validatedItems.push({
+        productId: item.productId || null,
+        name: productName,
+        unitPrice,
+        quantity: item.quantity,
+        totalPrice: itemTotal,
+      });
+    }
+
+    // 3. Increment Receipt Counter
+    const counter = await tx.counter.upsert({
+      where: { key: counterKey },
+      update: { value: { increment: 1 } },
+      create: { key: counterKey, value: 1 },
+    });
+
+    const sequence = counter.value.toString().padStart(4, "0");
+    const receiptNumber = `REC-${currentYear}-${sequence}`;
+
+    // Summary line for planName / description
+    const summaryLine = validatedItems
+      .map((i) => `${i.quantity}x ${i.name}`)
+      .join(", ")
+      .slice(0, 190);
+
+    // 4. Create Payment with PaymentItems
+    const createdPayment = await tx.payment.create({
+      data: {
+        receiptNumber,
+        memberId: member ? member.id : null,
+        planName: summaryLine || "Vente boutique",
+        amount: calculatedTotal,
+        totalAmount: calculatedTotal,
+        remainingBalance: 0,
+        paymentType: "POS_SALE",
+        method,
+        operatorId: operatorId || null,
+        items: {
+          create: validatedItems.map((vi) => ({
+            productId: vi.productId,
+            name: vi.name,
+            unitPrice: vi.unitPrice,
+            quantity: vi.quantity,
+            totalPrice: vi.totalPrice,
+          })),
+        },
+      },
+      include: {
+        member: true,
+        operator: true,
+        items: {
+          include: { product: true },
+        },
+      },
+    });
+
+    return createdPayment;
+  });
+
+  // Audit log
+  await withAudit({
+    userId: operatorId,
+    action: "CREATE",
+    entityType: "Payment",
+    entityId: payment.id,
+    after: {
+      receiptNumber: payment.receiptNumber,
+      amount: payment.amount,
+      paymentType: "POS_SALE",
+      memberId: payment.memberId,
+      itemCount: payment.items?.length || 0,
+    },
+  });
+
+  return payment;
+}
+
 export async function getReceiptDetails(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -257,6 +422,9 @@ export async function getReceiptDetails(paymentId: string) {
       operator: true,
       subscription: {
         include: { plan: true },
+      },
+      items: {
+        include: { product: true },
       },
     },
   });
